@@ -1,0 +1,145 @@
+import argparse
+import os
+import queue
+import concurrent.futures
+from functools import partial
+import pandas as pd
+from scenedetect import FrameTimecode
+import re
+from tqdm import tqdm
+
+
+def process_single_row(row, args):
+    video_path = row["video_path"]
+    new_rows = []
+
+    try:
+        if "timestamp" in row:
+            timestamp_str = row["timestamp"]
+            # 使用正则表达式解析时间戳
+            timestamp_pattern = r"\('(\d{2}:\d{2}:\d{2}\.\d+)', '(\d{2}:\d{2}:\d{2}\.\d+)'\)"
+            matches = re.findall(timestamp_pattern, timestamp_str)
+            scene_list = [(FrameTimecode(s, fps=row["fps"]), FrameTimecode(t, fps=row["fps"])) for s, t in matches]
+        else:
+            scene_list = [None]
+        if args.drop_invalid_timestamps:
+            return new_rows, True
+    except Exception as e:
+        if args.drop_invalid_timestamps:
+            return new_rows, False
+
+    height = row["height"]
+    width = row["width"]
+    fps = row["fps"]
+
+    for idx, scene in enumerate(scene_list):
+        if scene is not None:
+            s, t = scene  # FrameTimecode
+
+            fname = os.path.basename(video_path)
+            fname_wo_ext = os.path.splitext(fname)[0]
+
+            # 获取视频片段的信息
+            num_frames = t.frame_num - s.frame_num
+            aspect_ratio = width / height if height != 0 else 0
+            resolution = f"{width}x{height}"
+            timestamp_start = s.get_timecode()
+            timestamp_end = t.get_timecode()
+            frame_start = s.frame_num
+            frame_end = t.frame_num
+            id_ori = row["id"] if "id" in row else ""
+            id = f"{fname_wo_ext}_{idx}"
+            new_rows.append([video_path, id, num_frames, height, width, aspect_ratio, fps, resolution, timestamp_start, timestamp_end, frame_start, frame_end, id_ori])
+
+    return (new_rows, True)
+
+
+def worker(task_queue, results_queue, args):
+    while True:
+        try:
+            index, row = task_queue.get(timeout=1)
+        except queue.Empty:
+            break
+        result = process_single_row(row, args)
+        results_queue.put((index, result))
+        task_queue.task_done()
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("meta_path", type=str)
+    parser.add_argument("--csv_save_dir", type=str, required=True, help="Directory to save the CSV file")
+    parser.add_argument("--num_workers", type=int, default=None, help="#workers for concurrent.futures")
+    parser.add_argument("--disable_parallel", action="store_true", help="disable parallel processing")
+    parser.add_argument("--drop_invalid_timestamps", action="store_true", help="drop rows with invalid timestamps")
+    args = parser.parse_args()
+    return args
+
+
+def main():
+    args = parse_args()
+    meta_path = args.meta_path
+    if not os.path.exists(meta_path):
+        print(f"Meta file '{meta_path}' not found. Exit.")
+        return
+
+    os.makedirs(args.csv_save_dir, exist_ok=True)
+
+    meta = pd.read_csv(args.meta_path)
+
+    from multiprocessing import Manager
+    manager = Manager()
+    task_queue = manager.Queue()
+    results_queue = manager.Queue()
+
+    for index, row in meta.iterrows():
+        task_queue.put((index, row))
+
+    if args.disable_parallel:
+        results = []
+        for index, row in tqdm(meta.iterrows(), total=len(meta), desc="Processing rows"):
+            result = process_single_row(row, args)
+            results.append(result)
+    else:
+        if args.num_workers is not None:
+            num_workers = args.num_workers
+        else:
+            num_workers = os.cpu_count()
+
+        with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+            futures = []
+            for _ in range(num_workers):
+                future = executor.submit(worker, task_queue, results_queue, args)
+                futures.append(future)
+
+            for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Finished workers"):
+                future.result()
+
+        results = []
+        while not results_queue.empty():
+            results.append(results_queue.get())
+
+    results.sort(key=lambda x: x[0])
+    new_rows = []
+    valid_rows = []
+    for index, (rows, valid) in results:
+        valid_rows.append(index)
+        new_rows.extend(rows)
+
+    if args.drop_invalid_timestamps:
+        meta = meta[valid_rows]
+        assert args.meta_path.endswith("timestamp.csv"), "Only support *timestamp.csv"
+        meta.to_csv(args.meta_path.replace("timestamp.csv", "correct_timestamp.csv"), index=False)
+        print(f"Corrected timestamp file saved to '{args.meta_path.replace('timestamp.csv', 'correct_timestamp.csv')}'")
+
+    # 创建新的 DataFrame 并保存为 CSV 文件
+    columns = ["video_path", "id", "num_frames", "height", "width", "aspect_ratio", "fps", "resolution",
+               "timestamp_start", "timestamp_end", "frame_start", "frame_end", "id_ori"]
+    new_df = pd.DataFrame(new_rows, columns=columns)
+    new_csv_path = os.path.join(args.csv_save_dir, "clips_info.csv")
+    new_df.to_csv(new_csv_path, index=False)
+    print(f"Saved {len(new_df)} clip information to {new_csv_path}.")
+
+
+if __name__ == "__main__":
+    main()

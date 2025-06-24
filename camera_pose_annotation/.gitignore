@@ -1,0 +1,23 @@
+# files
+data/*
+*.log
+*.txt
+*.bz2
+*.zip
+*.ipynb
+data_videos
+!requirements.txt
+!requirements_megasam.txt
+
+#python
+*.pyc
+__pycache__/
+
+# dir
+outputs/
+outputs_303/
+data_videos/
+checkpoints/*
+!checkpoints/megasam_final.pth
+DROID-SLAM/
+.vscode/

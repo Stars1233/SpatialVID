@@ -1,0 +1,6 @@
+requests
+Pillow
+numpy
+tqdm
+argparse
+pandas

@@ -1,0 +1,3 @@
+I have the following data related to a video:
+
+Respectively, they are Camera Motion Caption, Scene Description, and camera pose info (representing x, y, z coordinates and rotation quaternion):\n
