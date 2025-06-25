@@ -1,3 +1,5 @@
+#!/bin/bash
+# put each evalset into python scripts (one by one) 
 measure_time() {
     local step_number=$1
     shift
@@ -17,8 +19,8 @@ measure_time() {
     echo "---------------------------------------"
 }
 
-CUDA_LIST=0
-GPU_NUM=1
+CUDA_LIST=0,1,2,3,4,5,6,7
+GPU_NUM=8
 
 CSV=test/outputs_scoring/meta/clips_scores.csv
 DIR_PATH=test/outputs_annotation
@@ -44,4 +46,11 @@ CUDA_VISIBLE_DEVICES=${CUDA_LIST} measure_time 3 torchrun --standalone --nproc_p
 
 measure_time 4 python camera_pose_annotation/camera_tracking/inference_batch.py ${CSV} --dir_path ${DIR_PATH} \
   --checkpoints_path checkpoints --gpu_id ${CUDA_LIST} \
+  --num_workers $((GPU_NUM * 2))
+
+measure_time 5 python utils/camera_pos_evaluation.py ${CSV} --dir_path ${DIR_PATH} \
+  --gpu_id ${CUDA_LIST} --num_workers $((GPU_NUM * 2))
+
+measure_time 6 python camera_pose_annotation/dynamic_mask/inference_batch.py ${CSV} --dir_path ${DIR_PATH} \
+  --checkpoints_path checkpoints --gpu_num ${GPU_NUM} \
   --num_workers $((GPU_NUM * 2))
