@@ -118,7 +118,7 @@ CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python -m utils/filter.py ${ROOT_META
   --output ${ROOT_META}/clips_filtered.csv \
   --num_workers ${NUM_WORKERS} \
   --aes_min 4 --flow_min 2 --lum_min 20 --lum_max 140 \
-  --motion_min 2 --motion_max 14 --ocr_max 0
+  --motion_min 2 --motion_max 14 --ocr_max 0.3
 
 # 8 Cut the clips.
 CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 8 python -m utils/cut.py ${ROOT_META}/clips_filtered.csv \
