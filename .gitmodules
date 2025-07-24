@@ -1,0 +1,6 @@
+[submodule "camera_pose_annotation/camera_pose_annotation"]
+	path = camera_pose_annotation/camera_pose_annotation
+	url = git@github.com:opencam-vid/base.git
+[submodule "camera_pose_annotation/base"]
+	path = camera_pose_annotation/base
+	url = git@github.com:opencam-vid/base.git
