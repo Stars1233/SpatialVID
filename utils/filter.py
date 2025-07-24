@@ -108,7 +108,8 @@ def main(args):
         assert "motion" in data.columns
         data = data[data["motion"] <= args.motion_max]
 
-    output_path = os.path.join(args.csv_save_dir, "filtered_clips.csv")
+    csv_save_dir = os.path.dirname(args.input[0])
+    output_path = os.path.join(csv_save_dir, "filtered_clips.csv")
     save_file(data, output_path)
     print(f"Saved {len(data)} samples to {output_path}.")
 
@@ -116,7 +117,6 @@ def main(args):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("input", type=str, nargs="+", help="path to the input dataset")
-    parser.add_argument("--csv_save_dir", type=str, required=True, help="Directory to save the CSV file")
     parser.add_argument("--format", type=str, default="csv", help="output format", choices=["csv", "parquet"])
     parser.add_argument("--seed", type=int, default=42, help="random seed")
 

@@ -12,15 +12,15 @@ def process_single_row(row, index, args, worker_id=0):
     device_id = worker_id % args.gpu_num
     
     cmd = (
-        f"CUDA_VISIBLE_DEVICES={args.gpu_id[device_id]} python camera_pose_annotation/camera_tracking/camera_tracking.py "
+        f"CUDA_VISIBLE_DEVICES={args.gpu_id[device_id]} python camera_pose_annotation/cvd_opt/preprocess/preprocess_flow.py "
         f"--dir_path {dir_path} "
-        f"--weights {args.checkpoints_path}/megasam_final.pth "
-        f"--disable_vis"
+        f"--model {args.checkpoints_path}/raft-things.pth "
+        f"--mixed_precision"
     )
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     if process.returncode != 0:
-        print(f"Error tracking camera for {row['id']}: {stderr.decode()}")
+        print(f"Error generating optical flow for {row['id']}: {stderr.decode()}")
 
 
 def worker(task_queue, args, worker_id, pbar):

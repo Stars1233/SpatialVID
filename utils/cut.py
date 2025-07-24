@@ -200,7 +200,7 @@ def main():
     # 创建新的 DataFrame 并保存为 CSV 文件
     columns = meta.columns  # 获取原始 DataFrame 的列名
     new_df = pd.DataFrame(new_rows, columns=columns)
-    new_csv_path = os.path.join(args.csv_save_dir, "clips_info_filtered.csv")
+    new_csv_path = os.path.join(args.csv_save_dir, "clips.csv")
     new_df.to_csv(new_csv_path, index=False)
     print(f"Saved {len(new_df)} clip information to {new_csv_path}.")
 

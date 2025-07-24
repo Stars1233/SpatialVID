@@ -50,6 +50,8 @@ def process_single_row(row, row_index, args):
 
     if args.interval is None:
         interval = row["num_frames"] // 3
+    else:
+        interval = int(args.interval * row["fps"])
 
     extract_frames(video_path, output_folder, interval, frame_start, num_frames, args.target_size)
 
@@ -66,7 +68,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Extract frames from a video file")
     parser.add_argument("csv_path", type=str, help="Path to the csv file")
     parser.add_argument("-o", "--output_folder", type=str, default="extract_frames", help="Output folder for extracted frames (default: extract_frames)")
-    parser.add_argument("-i", "--interval", type=int, default=None, help="Interval for frame extraction")
+    parser.add_argument("-i", "--interval", type=float, default=None, help="Interval for frame extraction")
     parser.add_argument("--target_size", type=str, default=None, help="Resize the frame to this size (width, height)")
     parser.add_argument("--num_workers", type=int, default=None, help="Number of workers for parallel processing")
     parser.add_argument("--disable_parallel", action="store_true", help="Disable parallel processing")

@@ -76,52 +76,36 @@ CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 3.2 torchrun --nproc_per
   --num_workers ${NUM_WORKERS} \
   --fig_load_dir ${ROOT_FIG}
 
-# # 3.3 Predict blur scores. This should output ${ROOT_META}/clips_info_blur.csv
+# 3.3 Predict blur scores. This should output ${ROOT_META}/clips_info_blur.csv
 CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 3.3 torchrun --nproc_per_node ${GPU_NUM} scoring/blur/inference.py \
   ${ROOT_META}/clips_info.csv \
   --bs 1 \
-  --num_workers ${NUM_WORKERS}
+  --num_workers ${NUM_WORKERS} \
+  --fig_load_dir ${ROOT_FIG}
 
-# 3.4 get optical flow. This should output ${ROOT_META}/clips_info_flow.csv
-# CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 3.4 torchrun --standalone --nproc_per_node ${GPU_NUM} scoring.optical_flow.inference.py \
-#   ${ROOT_META}/clips_info.csv \
-#   --bs 8 \
-#   --num_workers ${NUM_WORKERS} \
-#   --fig_load_dir ${ROOT_FIG} \
-#   --use_cudnn > ${ROOT_LOG}/flow.txt
-
-# CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 3.4 python scoring/motion/inference.py ${ROOT_META}/clips_info.csv \
-#   --temp_save_dir ${ROOT_TEMP} \
-#   --num_workers $((GPU_NUM * 4)) \
-#   --gpu_num ${GPU_NUM} > ${ROOT_LOG}/motion.txt
+# 3.4 get motion score. This should output ${ROOT_META}/clips_info_motion.csv
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 3.4 python scoring/motion/inference.py ${ROOT_META}/clips_info.csv \
+  --temp_save_dir ${ROOT_TEMP} \
+  --num_workers $((GPU_NUM * 4)) \
+  --gpu_num ${GPU_NUM}
   
 # 3.5 get text by OCR using mmocr's DBNet, this should output ${ROOT_META}/clips_info_ocr.csv
-# CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 3.5 torchrun --standalone --nproc_per_node ${GPU_NUM} -m tools.scoring.ocr.inference \
-#   ${ROOT_META}/clips_info.csv \
-#   --bs 8 \
-#   --num_workers ${NUM_WORKERS} \
-#   --fig_load_dir ${ROOT_FIG} > ${ROOT_LOG}/ocr.txt
 
-# # 4.1 camera motion by Gunnar Farneback method, this should output ${ROOT_META}/clips_info_cmotion.csv
-# CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 4.1 python -m tools.caption.camera_motion_detect ${ROOT_META}/clips_info.csv \
-#   --num_workers ${NUM_WORKERS} > ${ROOT_LOG}/cmotion.txt
 
 # 5 merge all the scores. This should output ${ROOT_META}/clips_with_score.csv
-CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 5 python utils/merge_tables.py ${ROOT_META} --output ${ROOT_META}/clips_scores.csv > ${ROOT_LOG}/merge.txt
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 5 python utils/merge_tables.py ${ROOT_META} --output ${ROOT_META}/clips_scores.csv
 
 # 6 Plot the scores
 CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 6 python utils/plot_score.py ${ROOT_META}/clips_scores.csv \
   --num_workers 64 --fig_save_dir ${ROOT_FIG}
 
 # 7 Filter the clips.
-CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python -m utils/filter.py ${ROOT_META}/clips_scores.csv \
-  --output ${ROOT_META}/clips_filtered.csv \
-  --num_workers ${NUM_WORKERS} \
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python utils/filter.py ${ROOT_META}/clips_scores.csv \
   --aes_min 4 --flow_min 2 --lum_min 20 --lum_max 140 \
   --motion_min 2 --motion_max 14 --ocr_max 0.3
 
 # 8 Cut the clips.
-CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 8 python -m utils/cut.py ${ROOT_META}/clips_filtered.csv \
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 8 python utils/cut.py ${ROOT_META}/filtered_clips.csv \
   --ffmpeg_path ffmpeg \
   --video_save_dir ${ROOT_CLIPS} --csv_save_dir ${ROOT_META} \
   --num_workers $((GPU_NUM * 4)) --gpu_num $GPU_NUM

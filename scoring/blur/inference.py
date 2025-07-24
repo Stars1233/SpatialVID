@@ -66,7 +66,7 @@ class VideoDataset(torch.utils.data.Dataset):
             # convert to grayscale
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             # compute blur amount
-            blur_score = compute_blur(gray, use_cuda=True)
+            blur_score = compute_blur(gray)
             blur_scores.append(blur_score)
         
         return {"index": index, "blur": np.mean(blur_scores)}

@@ -25,13 +25,8 @@ import glob
 import os
 import sys
 
-# pylint: disable=g-bad-import-order
-# pylint: disable=g-import-not-at-top
-
 import numpy as np
 import torch
-# FLOW ESTIMATOR
-sys.path.append('cvd_opt/core')
 
 
 def warp_flow(img, flow):

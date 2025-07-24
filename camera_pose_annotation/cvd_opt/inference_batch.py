@@ -12,15 +12,14 @@ def process_single_row(row, index, args, worker_id=0):
     device_id = worker_id % args.gpu_num
     
     cmd = (
-        f"CUDA_VISIBLE_DEVICES={args.gpu_id[device_id]} python camera_pose_annotation/camera_tracking/camera_tracking.py "
+        f"CUDA_VISIBLE_DEVICES={args.gpu_id[device_id]} python camera_pose_annotation/cvd_opt/cvd_opt.py "
         f"--dir_path {dir_path} "
-        f"--weights {args.checkpoints_path}/megasam_final.pth "
-        f"--disable_vis"
+        f"--w_grad 2.0 --w_normal 5.0 "
     )
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     if process.returncode != 0:
-        print(f"Error tracking camera for {row['id']}: {stderr.decode()}")
+        print(f"Error optimizing CVD for {row['id']}: {stderr.decode()}")
 
 
 def worker(task_queue, args, worker_id, pbar):
@@ -38,7 +37,6 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('csv_path', type=str, help='Path to the csv file')
     parser.add_argument('--dir_path', type=str, default='./outputs')
-    parser.add_argument('--checkpoints_path', type=str, default='./checkpoints')
     parser.add_argument('--gpu_id', type=str, default='0', help='Comma-separated list of GPU IDs to use')
     parser.add_argument('--num_workers', type=int, default=4, help='Number of workers for parallel processing')
     parser.add_argument('--disable_parallel', action='store_true', help='Disable parallel processing')
