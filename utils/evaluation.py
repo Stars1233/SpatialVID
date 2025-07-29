@@ -12,21 +12,24 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from scipy.ndimage import gaussian_filter
 
+from .expand import expand
 
-def load_camera_poses(file_path, device):
+
+def load_file(cam_pos_file, mask_file, device):
     try:
-        prams = torch.from_numpy(np.load(file_path)).float().to(device)
+        prams = torch.from_numpy(np.load(cam_pos_file)).float().to(device)
         cam_pos = prams[:, :3]
         cam_rotate = prams[:, 3:]
         time_steps = prams.shape[0]
+        masks = torch.from_numpy(expand(np.load(mask_file))).to(device)
     except FileNotFoundError:
-        print(f"error: {file_path} not found")
+        print(f"error: {cam_pos_file} not found")
         exit()
     except Exception as e:
-        print(f"error occurred in {file_path}: {e}")
+        print(f"error occurred in {cam_pos_file}: {e}")
         exit()
 
-    return cam_pos, cam_rotate, time_steps
+    return cam_pos, cam_rotate, time_steps, masks
 
 
 def anomaly_detection(cam_pos, time_steps, threshold, device):
@@ -114,7 +117,7 @@ def rotation_angle(cam_rotate, time_steps, device):
     return total_rad.item()
 
 
-def arc_counter(cam_pos, time_steps, device,threshold=0.45):
+def arc_counter(cam_pos, time_steps, device, threshold=0.45):
     if time_steps < 3:  # 至少需要3个点才能形成两个向量
         return [], 0
     
@@ -152,16 +155,27 @@ def arc_counter(cam_pos, time_steps, device,threshold=0.45):
     return peaks_values, len(peaks_values)
 
 
+def mask_ratio(masks):
+    # 每隔5帧取一个mask
+    masks = masks[::5, :, :]
+    # 计算每一个mask占整个图像的占比
+    mask_area = torch.sum(masks)  # (num_frames,)
+    total_area = masks.shape[1] * masks.shape[2] * masks.shape[0]  # (1,)
+    mask_area_ratio = mask_area / total_area  # (1,)
+    return mask_area_ratio.item()
+
+
 def possess_single_row(row, index, args, device):
     id = row['id']
     rec_path = os.path.join(args.dir_path, id, "reconstructions")
     cam_pos_file = os.path.join(rec_path, "poses.npy")
-    if not os.path.exists(cam_pos_file):
-        print(f"File not found: {cam_pos_file}")
-        return False, False, -1, -1, -1, -1, -1
+    mask_file = os.path.join(rec_path, "dyn_masks.npz")
+    if not os.path.exists(cam_pos_file) or not os.path.exists(mask_file):
+        print(f"File not found: {cam_pos_file} or {mask_file}")
+        return False, False, -1, -1, -1, -1, -1, -1
 
     # 加载相机位姿数据
-    cam_pos, cam_rotate, time_steps = load_camera_poses(cam_pos_file, device)
+    cam_pos, cam_rotate, time_steps, masks = load_file(cam_pos_file, mask_file, device)
 
     # 检测异常
     anomaly = anomaly_detection(cam_pos, time_steps, args.anomaly_threshold, device)
@@ -175,7 +189,10 @@ def possess_single_row(row, index, args, device):
     # 计算弧形个数
     arcs, arcs_num = arc_counter(cam_pos, time_steps, device)
 
-    return True, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num
+    # 计算动态mask占比
+    mask_area_ratio = mask_ratio(masks)
+
+    return True, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num, mask_area_ratio
 
 
 def worker(task_queue, result_queue, args, id):
@@ -185,8 +202,8 @@ def worker(task_queue, result_queue, args, id):
             index, row = task_queue.get(timeout=1)
         except queue.Empty:
             break
-        success, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num = possess_single_row(row, index, args, device)
-        result_queue.put((index, (success, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num)))
+        success, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num, mask_area_ratio = possess_single_row(row, index, args, device)
+        result_queue.put((index, (success, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num, mask_area_ratio)))
         task_queue.task_done()
 
 
@@ -194,6 +211,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Camera Pose Evaluation")
     parser.add_argument("csv_path", type=str, help="Path to the csv file")
     parser.add_argument("--dir_path", type=str, default="./outputs")
+    parser.add_argument("--output_path", type=str, default="./outputs/evaluation_results.csv")
     parser.add_argument("--anomaly_threshold", type=int,
                         default=2, help="Threshold for anomaly detection")
     parser.add_argument('--gpu_id', type=str, default='0', help='Comma-separated list of GPU IDs to use')
@@ -217,8 +235,8 @@ if __name__ == "__main__":
     if args.disable_parallel:
         for index, row in tqdm(df.iterrows(), total=len(df)):
             device = torch.device(f"cuda:{args.gpu_id[0]}") if torch.cuda.is_available() else torch.device("cpu")
-            success, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num = possess_single_row(row, index, args, device)
-            results.append(index, (success, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num))
+            success, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num, mask_area_ratio = possess_single_row(row, index, args, device)
+            results.append(index, (success, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num, mask_area_ratio))
     else:
         manager = Manager()
         task_queue = manager.Queue()
@@ -235,8 +253,8 @@ if __name__ == "__main__":
                 
         # Collect results
         while not result_queue.empty():
-            index, (success, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num) = result_queue.get()
-            results.append((index, (success, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num)))
+            index, (success, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num, mask_area_ratio) = result_queue.get()
+            results.append((index, (success, anomaly, total_distance, intensity, total_rotation_angle, arcs, arcs_num, mask_area_ratio)))
 
     results.sort(key=lambda x: x[0])
     # 拼接到原csv文件
@@ -247,7 +265,8 @@ if __name__ == "__main__":
     df['camera_orient_angle'] = [result[1][4] for result in results]
     df['arcs'] = [result[1][5] for result in results]
     df['arcs_num'] = [result[1][6] for result in results]
+    df['mask_area_ratio'] = [result[1][7] for result in results]
 
     # 保存结果
-    df.to_csv(args.csv_path, index=False)
-    print(f"Results saved to {args.csv_path}")
+    df.to_csv(args.output_path, index=False)
+    print(f"Results saved to {args.output_path}")
