@@ -2,9 +2,10 @@ import os
 import numpy as np
 import torch
 import torch.nn.functional as F
-import glob
+from glob import glob
 import cv2
 from scipy import ndimage
+from scipy.sparse import csr_matrix
 import argparse
 import pandas as pd
 import subprocess
@@ -15,6 +16,19 @@ from tqdm import tqdm
 
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
+
+def compress(dyn_masks, save_path=None):
+    assert save_path.endswith('.npz')
+    # transform to sparse matrices
+    sparse_matrices_list = [csr_matrix(dyn_mask) for dyn_mask in dyn_masks]
+    sparse_matrices = {}
+    for i, dyn_mask in enumerate(sparse_matrices_list):
+        sparse_matrices[f'f_{i}_data'] = dyn_mask.data
+        sparse_matrices[f'f_{i}_indices'] = dyn_mask.indices
+        sparse_matrices[f'f_{i}_indptr'] = dyn_mask.indptr
+        if i == 0:
+            sparse_matrices['shape'] = dyn_mask.shape
+    np.savez_compressed(save_path,**sparse_matrices)
 
 def segment_sky(image):
     # Convert RGB to HSV
@@ -55,10 +69,10 @@ def predict_mask(predictor, row, args, device):
     if not os.path.exists(dir_path):
         print(f"Directory '{dir_path}' not found. Exit.")
         return
-    # img_dir = os.path.join(args.img_dir, str(row["id"]), "img")
-    # if not os.path.exists(img_dir):
-    #     print(f"Image directory '{img_dir}' not found. Exit.")
-    #     return
+    img_dir = os.path.join(args.dir_path, str(row["id"]), "img")
+    if not os.path.exists(img_dir):
+        print(f"Image directory '{img_dir}' not found. Exit.")
+        return
     rec_dir = os.path.join(dir_path, "reconstructions")
     if not os.path.exists(rec_dir):
         print(f"Reconstructions directory '{rec_dir}' not found. Exit.")
@@ -68,24 +82,14 @@ def predict_mask(predictor, row, args, device):
         print(f"Motion probability file '{prob_file}' not found. Exit.")
         return
     
-    mask_file = os.path.join(rec_dir, "dyn_masks.npy")
-    if os.path.exists(mask_file):
+    compress_file = os.path.join(rec_dir, "dyn_masks.npz")
+    if os.path.exists(compress_file):
         return
     
     motion_probs = torch.from_numpy(np.load(prob_file)).to(device)
     
-    images = []
-    cap = cv2.VideoCapture(row["video_path"])
-    interval = int(row["fps"] * 0.2)
-    for frame in range(row["num_frames"]):
-        ret, image = cap.read()
-        if not ret:
-            break
-        # Save the frame as an image file
-        if frame % interval == 0:
-            # frame_filename = os.path.join(output_folder, f"frame_{frame:06d}.jpg")
-            # cv2.imwrite(frame_filename, image)
-            images.append(image)
+    images_list = list(sorted(glob(os.path.join(img_dir, "*.jpg"))))
+    images = [cv2.imread(img_path) for img_path in images_list]
         
     if len(images) == 0 or len(images) != len(motion_probs):
         print(f"{row['video_path']},Number of frames ({len(images)}) does not match number of motion probabilities ({len(motion_probs)}). Exit.")
@@ -148,7 +152,7 @@ def predict_mask(predictor, row, args, device):
         masks.append(merged_mask)
         
     masks = np.stack(masks, axis=0)
-    np.save(mask_file, masks)
+    compress(masks, compress_file)
     
 
 def worker(task_queue, args, id):
@@ -179,7 +183,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description="SAM2 Image Predictor")
     parser.add_argument('csv_path', type=str, help='Path to the csv file')
     parser.add_argument("--dir_path", type=str, required=True, help="Path to the directory containing images and masks")
-    parser.add_argument("--img_dir", type=str, default="img", help="Directory containing images")
     parser.add_argument("--num_workers", type=int, default=16, help="#workers for concurrent.futures")
     parser.add_argument("--gpu_num", type=int, default=1, help="gpu number")
     parser.add_argument("--checkpoints_path", type=str, default="checkpoints", help="Path to the model checkpoint")
@@ -195,10 +198,6 @@ def main():
     args.checkpoints_path = os.path.join(args.checkpoints_path, "SAM2/sam2.1_hiera_large.pt")
 
     df = pd.read_csv(args.csv_path)
-    print(f"Total frames: {len(df)}")
-    df = df[df["success"] == True]
-    df = df[df["anomaly"] == False]
-    print(f"Qualified frames: {len(df)}")
 
     manager = Manager()
     task_queue = manager.Queue()
