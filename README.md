@@ -1,8 +1,3 @@
-```bash
-git clone --recursive https://github.com/opencam-vid/SpatialVid.git
-cd SpatialVid
-```
-
 ## 环境配置
 
 ```bash
@@ -15,6 +10,8 @@ pip install -r requirements/requirements.txt
 ```bash
 pip install -r requirements/requirements_scoring.txt
 ```
+
+Ignore the warning about `nvidia-nccl-cu12` version, it is not a problem.
 
 You need to go into `path_to_your_env/lib/python3.10/site-packages/cpbd/compute.py` and change the import of `from scipy.ndimage import imread` to `from imageio import imread`.
 
