@@ -11,3 +11,6 @@ ffmpeg-python==0.2.0
 # remove later
 clip@ git+https://githubfast.com/openai/CLIP.git@dcba3cb2e2827b402d2701e7e1c7d9fed8a20ef1
 cpbd==1.0.7
+paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
+paddleocr==3.1.0
+nvidia-nccl-cu12==2.21.5
