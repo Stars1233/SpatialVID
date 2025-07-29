@@ -89,23 +89,22 @@ CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 3.4 python scoring/motio
   --num_workers $((GPU_NUM * 4)) \
   --gpu_num ${GPU_NUM}
   
-# 3.5 get text by OCR using mmocr's DBNet, this should output ${ROOT_META}/clips_info_ocr.csv
+# 3.5 get text by OCR using PaddleOCR, this should output ${ROOT_META}/clips_info_ocr.csv
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 3.5 python scoring/ocr/inference.py ${ROOT_META}/clips_info.csv \
+  --num_workers $((GPU_NUM * 4)) \
+  --gpu_num ${GPU_NUM} \
+  --fig_load_dir ${ROOT_FIG}
 
+# 4 merge all the scores. This should output ${ROOT_META}/clips_with_score.csv
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 4 python utils/merge_tables.py ${ROOT_META} --output ${ROOT_META}/clips_scores.csv
 
-# 5 merge all the scores. This should output ${ROOT_META}/clips_with_score.csv
-CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 5 python utils/merge_tables.py ${ROOT_META} --output ${ROOT_META}/clips_scores.csv
-
-# 6 Plot the scores
-CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 6 python utils/plot_score.py ${ROOT_META}/clips_scores.csv \
-  --num_workers 64 --fig_save_dir ${ROOT_FIG}
-
-# 7 Filter the clips.
-CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python utils/filter.py ${ROOT_META}/clips_scores.csv \
-  --aes_min 4 --flow_min 2 --lum_min 20 --lum_max 140 \
+# 5 Filter the clips.
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 5 python utils/filter.py ${ROOT_META}/clips_scores.csv \
+  --aes_min 4 --lum_min 20 --lum_max 140 \
   --motion_min 2 --motion_max 14 --ocr_max 0.3
 
-# 8 Cut the clips.
-CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 8 python utils/cut.py ${ROOT_META}/filtered_clips.csv \
+# 6 Cut the clips.
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 6 python utils/cut.py ${ROOT_META}/filtered_clips.csv \
   --ffmpeg_path ffmpeg \
   --video_save_dir ${ROOT_CLIPS} --csv_save_dir ${ROOT_META} \
   --num_workers $((GPU_NUM * 4)) --gpu_num $GPU_NUM
