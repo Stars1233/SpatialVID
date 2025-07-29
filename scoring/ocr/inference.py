@@ -7,7 +7,7 @@ import queue
 import concurrent.futures
 from tqdm import tqdm
 import cv2
-import glob
+from glob import glob
 
 from paddleocr import PaddleOCR
 
