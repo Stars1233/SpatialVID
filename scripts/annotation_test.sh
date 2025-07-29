@@ -43,24 +43,25 @@ CUDA_VISIBLE_DEVICES=${CUDA_LIST} measure_time 3 torchrun --standalone --nproc_p
   --bs 32 \
   --num_workers ${GPU_NUM}
 
-measure_time 4 python camera_pose_annotation/camera_tracking/inference_batch.py ${CSV} \
+CUDA_VISIBLE_DEVICES=${CUDA_LIST} measure_time 4 python camera_pose_annotation/camera_tracking/inference_batch.py ${CSV} \
   --dir_path ${DIR_PATH} \
   --checkpoints_path checkpoints --gpu_id ${CUDA_LIST} \
   --num_workers $((GPU_NUM * 2))
 
-measure_time 5 python camera_pose_annotation/cvd_opt/preprocess/inference_batch.py ${CSV} \
+CUDA_VISIBLE_DEVICES=${CUDA_LIST} measure_time 5 python camera_pose_annotation/cvd_opt/preprocess/inference_batch.py ${CSV} \
   --dir_path ${DIR_PATH} \
   --checkpoints_path checkpoints --gpu_id ${CUDA_LIST} \
   --num_workers $((GPU_NUM * 2))
 
-measure_time 6 python camera_pose_annotation/cvd_opt/inference_batch.py ${CSV} \
+CUDA_VISIBLE_DEVICES=${CUDA_LIST} measure_time 6 python camera_pose_annotation/cvd_opt/inference_batch.py ${CSV} \
   --dir_path ${DIR_PATH} \
   --gpu_id ${CUDA_LIST} \
   --num_workers $((GPU_NUM * 2))
 
-measure_time 7 python utils/camera_pos_evaluation.py ${CSV} --dir_path ${DIR_PATH} \
-  --gpu_id ${CUDA_LIST} --num_workers $((GPU_NUM * 2))
-
-measure_time 8 python camera_pose_annotation/dynamic_mask/inference_batch.py ${CSV} --dir_path ${DIR_PATH} \
+CUDA_VISIBLE_DEVICES=${CUDA_LIST} measure_time 7 python camera_pose_annotation/dynamic_mask/inference_batch.py ${CSV} --dir_path ${DIR_PATH} \
   --checkpoints_path checkpoints --gpu_num ${GPU_NUM} \
   --num_workers $((GPU_NUM * 2))
+
+measure_time 8 python utils/evaluation.py ${CSV} --dir_path ${DIR_PATH} \
+  --gpu_id ${CUDA_LIST} --num_workers $((GPU_NUM * 2)) \
+  --output_path ${DIR_PATH}/results.csv \
