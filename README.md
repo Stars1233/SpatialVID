@@ -1,3 +1,8 @@
+```bash
+git clone --recursive https://github.com/opencam-vid/SpatialVid.git
+cd SpatialVid
+```
+
 ## 环境配置
 
 ```bash
