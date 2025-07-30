@@ -1,3 +1,6 @@
+paddlepaddle-gpu==3.0.0 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/
+paddleocr==3.1.0
+nvidia-nccl-cu12==2.26.2
 ftfy==6.3.1
 diffusers==0.29.0
 accelerate==1.4.0
@@ -10,6 +13,3 @@ clip @ git+https://github.com/openai/CLIP.git
 # remove later
 # clip@ git+https://githubfast.com/openai/CLIP.git
 cpbd==1.0.7
-paddlepaddle-gpu==3.0.0 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/
-paddleocr==3.1.0
-nvidia-nccl-cu12==2.26.2
