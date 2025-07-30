@@ -7,12 +7,14 @@ cd SpatialVid
 
 ```bash
 conda create -n SpatialVid python=3.10.13
+conda activate SpatialVid
 pip install -r requirements/requirements.txt
 ```
 
 1. scoring 环境
 
 ```bash
+pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
 pip install -r requirements/requirements_scoring.txt
 ```
 
