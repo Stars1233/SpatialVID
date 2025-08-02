@@ -58,10 +58,13 @@ CUDA_VISIBLE_DEVICES=${CUDA_LIST} measure_time 6 python camera_pose_annotation/c
   --gpu_id ${CUDA_LIST} \
   --num_workers $((GPU_NUM * 2))
 
-CUDA_VISIBLE_DEVICES=${CUDA_LIST} measure_time 7 python camera_pose_annotation/dynamic_mask/inference_batch.py ${CSV} --dir_path ${DIR_PATH} \
+CUDA_VISIBLE_DEVICES=${CUDA_LIST} measure_time 7 python utils/c2w.py ${CSV} --dir_path ${DIR_PATH} \
+  --num_workers $((GPU_NUM * 2))
+
+CUDA_VISIBLE_DEVICES=${CUDA_LIST} measure_time 8 python camera_pose_annotation/dynamic_mask/inference_batch.py ${CSV} --dir_path ${DIR_PATH} \
   --checkpoints_path checkpoints --gpu_num ${GPU_NUM} \
   --num_workers $((GPU_NUM * 2))
 
-measure_time 8 python utils/evaluation.py ${CSV} --dir_path ${DIR_PATH} \
+measure_time 9 python utils/evaluation.py ${CSV} --dir_path ${DIR_PATH} \
   --gpu_id ${CUDA_LIST} --num_workers $((GPU_NUM * 2)) \
-  --output_path ${DIR_PATH}/results.csv \
+  --output_path ${DIR_PATH}/results.csv
