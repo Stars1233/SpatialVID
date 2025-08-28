@@ -1,5 +1,4 @@
 #!/bin/bash
-#
 
 # VQA
 vqa_prompt_file="caption/VQA/vqa_prompt2.txt"
