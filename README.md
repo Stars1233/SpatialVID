@@ -19,9 +19,10 @@
 </div>
 <br>
 <div align="center">
-  <a href="https://nju-pcalab.github.io/projects/openvid/"><img src="https://img.shields.io/static/v1?label=OpenVid-1M&message=Project&color=purple"></a>  
+  <a href="https://nju-pcalab.github.io/projects/openvid/"><img src="https://img.shields.io/static/v1?label=SpatialVid&message=Project&color=purple"></a>  
   <a href="https://arxiv.org/abs/2407.02371"><img src="https://img.shields.io/static/v1?label=Paper&message=Arxiv&color=red&logo=arxiv"></a>  
-  <a href="https://huggingface.co/SpatialVid"><img src="https://img.shields.io/static/v1?label=Dataset&message=HuggingFace&color=yellow"></a>  
+  <a href="https://github.com/opencam-vid/SpatialVid"><img src="https://img.shields.io/static/v1?label=Code&message=Github&color=blue&logo=github"></a>  
+  <a href="https://huggingface.co/SpatialVid"><img src="https://img.shields.io/static/v1?label=Dataset&message=HuggingFace&color=yellow&logo=huggingface"></a>  
 </div>
 <p align="center">
   <img src="assets/overview.jpg"  height=400>
