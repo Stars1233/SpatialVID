@@ -35,16 +35,12 @@ def gradient_loss(gt, pred, u):
     """Gradient loss."""
     del u
     diff = pred - gt
-    v_gradient = torch.abs(
-        diff[..., 0:-2, 1:-1] - diff[..., 2:, 1:-1]
-    )  # * mask_v
-    h_gradient = torch.abs(
-        diff[..., 1:-1, 0:-2] - diff[..., 1:-1, 2:]
-    )  # * mask_h
+    v_gradient = torch.abs(diff[..., 0:-2, 1:-1] - diff[..., 2:, 1:-1])  # * mask_v
+    h_gradient = torch.abs(diff[..., 1:-1, 0:-2] - diff[..., 1:-1, 2:])  # * mask_h
 
-    pred_grad = torch.abs(
-        pred[..., 0:-2, 1:-1] - (pred[..., 2:, 1:-1])
-    ) + torch.abs(pred[..., 1:-1, 0:-2] - pred[..., 1:-1, 2:])
+    pred_grad = torch.abs(pred[..., 0:-2, 1:-1] - (pred[..., 2:, 1:-1])) + torch.abs(
+        pred[..., 1:-1, 0:-2] - pred[..., 1:-1, 2:]
+    )
     gt_grad = torch.abs(gt[..., 0:-2, 1:-1] - (gt[..., 2:, 1:-1])) + torch.abs(
         gt[..., 1:-1, 0:-2] - gt[..., 1:-1, 2:]
     )
@@ -71,9 +67,7 @@ def si_loss(gt, pred):
 
 
 def sobel_fg_alpha(disp, mode="sobel", beta=10.0):
-    sobel_grad = kornia.filters.spatial_gradient(
-        disp, mode=mode, normalized=False
-    )
+    sobel_grad = kornia.filters.spatial_gradient(disp, mode=mode, normalized=False)
     sobel_mag = torch.sqrt(
         sobel_grad[:, :, 0, Ellipsis] ** 2 + sobel_grad[:, :, 1, Ellipsis] ** 2
     )
@@ -112,9 +106,7 @@ def consistency_loss(
     yy = torch.arange(0, H).view(-1, 1).repeat(1, W)
     xx = xx.view(1, 1, H, W)  # .repeat(B ,1 ,1 ,1)
     yy = yy.view(1, 1, H, W)  # .repeat(B ,1 ,1 ,1)
-    grid = (
-        torch.cat((xx, yy), 1).float().cuda().permute(0, 2, 3, 1)
-    )  # [None, ...]
+    grid = torch.cat((xx, yy), 1).float().cuda().permute(0, 2, 3, 1)  # [None, ...]
 
     loss_flow = 0.0  # flow reprojection loss
     loss_d_ratio = 0.0  # depth consistency loss
@@ -140,9 +132,7 @@ def consistency_loss(
 
     uu = torch.index_select(uncertainty, dim=0, index=ii).squeeze(1)
 
-    grid_h = torch.cat([grid, torch.ones_like(grid[..., 0:1])], dim=-1).unsqueeze(
-        -1
-    )
+    grid_h = torch.cat([grid, torch.ones_like(grid[..., 0:1])], dim=-1).unsqueeze(-1)
     # depth of reference view
     ref_depth = 1.0 / torch.clamp(
         torch.index_select(disp_data, dim=0, index=ii), 1e-3, 1e3
@@ -179,10 +169,7 @@ def consistency_loss(
 
     flow_error = torch.abs(pts_2D_tgt - pixel_locations)
     loss_flow += torch.sum(
-        (
-            flow_error * uu[..., None]
-            + ALPHA_MOTION * torch.log(1.0 / uu[..., None])
-        )
+        (flow_error * uu[..., None] + ALPHA_MOTION * torch.log(1.0 / uu[..., None]))
         * flow_masks_step_[..., None]
     ) / (torch.sum(flow_masks_step_) * 2.0 + 1e-8)
 
@@ -245,6 +232,7 @@ def parse_args():
 
     return parser.parse_args()
 
+
 if __name__ == "__main__":
     args = parse_args()
 
@@ -254,29 +242,16 @@ if __name__ == "__main__":
     rootdir = os.path.join(args.dir_path, "reconstructions")
 
     print("***************************** ", scene_name)
-    img_data = np.load(os.path.join(rootdir, "images.npy"))[
-        :, ::-1, ...
-    ]
-    disp_data = (
-        np.load(
-            os.path.join(rootdir, "disps.npy")
-        )
-        + 1e-6
-    )
+    img_data = np.load(os.path.join(rootdir, "images.npy"))[:, ::-1, ...]
+    disp_data = np.load(os.path.join(rootdir, "disps.npy")) + 1e-6
     intrinsics = np.load(os.path.join(rootdir, "intrinsics.npy"))
     poses = np.load(os.path.join(rootdir, "poses.npy"))
     mot_prob = np.load(os.path.join(rootdir, "motion_prob.npy"))
 
-    flows = np.load(
-        os.path.join(cache_dir, "flows.npy"), allow_pickle=True
-    )
-    flow_masks = np.load(
-        os.path.join(cache_dir, "flows_masks.npy"), allow_pickle=True
-    )
+    flows = np.load(os.path.join(cache_dir, "flows.npy"), allow_pickle=True)
+    flow_masks = np.load(os.path.join(cache_dir, "flows_masks.npy"), allow_pickle=True)
     flow_masks = np.float32(flow_masks)
-    iijj = np.load(
-        os.path.join(cache_dir, "ii-jj.npy"), allow_pickle=True
-    )
+    iijj = np.load(os.path.join(cache_dir, "ii-jj.npy"), allow_pickle=True)
 
     intrinsics = intrinsics[0]
     poses_th = torch.as_tensor(poses, device="cpu").float().cuda()
@@ -343,16 +318,16 @@ if __name__ == "__main__":
     shift_.requires_grad = True
     uncertainty.requires_grad = True
 
-    optim = torch.optim.Adam([
-        {"params": log_scale_, "lr": 1e-2},
-        {"params": shift_, "lr": 1e-2},
-        {"params": uncertainty, "lr": 1e-2},
-    ])
+    optim = torch.optim.Adam(
+        [
+            {"params": log_scale_, "lr": 1e-2},
+            {"params": shift_, "lr": 1e-2},
+            {"params": uncertainty, "lr": 1e-2},
+        ]
+    )
 
     compute_normals = []
-    compute_normals.append(
-        NormalGenerator(disp_data.shape[-2], disp_data.shape[-1])
-    )
+    compute_normals.append(NormalGenerator(disp_data.shape[-2], disp_data.shape[-1]))
     init_disp = torch.clamp(init_disp, 1e-3, 1e3)
 
     for i in range(100):
@@ -402,10 +377,12 @@ if __name__ == "__main__":
     uncertainty.requires_grad = True
     poses_th.requires_grad = False  # True
 
-    optim = torch.optim.Adam([
-        {"params": disp_data, "lr": 5e-3},
-        {"params": uncertainty, "lr": 5e-3},
-    ])
+    optim = torch.optim.Adam(
+        [
+            {"params": disp_data, "lr": 5e-3},
+            {"params": uncertainty, "lr": 5e-3},
+        ]
+    )
 
     losses = []
     for i in range(400):

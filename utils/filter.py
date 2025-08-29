@@ -1,17 +1,20 @@
+"""
+Dataset filtering utility for video metadata with various quality metrics.
+"""
+
 import argparse
 import os
 import random
 from glob import glob
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-import concurrent.futures
 
 
 # ======================================================
-# read & write
+# File I/O functions
 # ======================================================
 def read_file(input_path):
+    """Read CSV or Parquet file"""
     if input_path.endswith(".csv"):
         return pd.read_csv(input_path)
     elif input_path.endswith(".parquet"):
@@ -21,6 +24,7 @@ def read_file(input_path):
 
 
 def save_file(data, output_path):
+    """Save DataFrame to CSV or Parquet file"""
     output_dir = os.path.dirname(output_path)
     if not os.path.exists(output_dir) and output_dir != "":
         os.makedirs(output_dir)
@@ -33,32 +37,37 @@ def save_file(data, output_path):
 
 
 def read_data(input_paths):
+    """Load and concatenate multiple data files"""
     data = []
     input_list = []
     for input_path in input_paths:
         input_list.extend(glob(input_path))
     print("Input files:", input_list)
+
     for i, input_path in enumerate(input_list):
         if not os.path.exists(input_path):
             continue
         data.append(read_file(input_path))
         print(f"Loaded {len(data[-1])} samples from '{input_path}'.")
+
     if len(data) == 0:
         print(f"No samples to process. Exit.")
         exit()
+
     data = pd.concat(data, ignore_index=True, sort=False)
     print(f"Total number of samples: {len(data)}")
     return data
 
 
 # ======================================================
-# main
+# Main filtering logic
 # ======================================================
 def main(args):
-    # reading data
+    """Apply filtering criteria to dataset"""
+    # Load data
     data = read_data(args.input)
 
-    # filtering
+    # Apply filters based on various metrics
     if args.frames_min is not None:
         assert "num_frames" in data.columns
         data = data[data["num_frames"] >= args.frames_min]
@@ -108,6 +117,7 @@ def main(args):
         assert "motion" in data.columns
         data = data[data["motion"] <= args.motion_max]
 
+    # Save filtered data
     csv_save_dir = os.path.dirname(args.input[0])
     output_path = os.path.join(csv_save_dir, "filtered_clips.csv")
     save_file(data, output_path)
@@ -115,32 +125,68 @@ def main(args):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("input", type=str, nargs="+", help="path to the input dataset")
-    parser.add_argument("--format", type=str, default="csv", help="output format", choices=["csv", "parquet"])
-    parser.add_argument("--seed", type=int, default=42, help="random seed")
+    """Parse command line arguments for dataset filtering"""
+    parser = argparse.ArgumentParser(
+        description="Filter video dataset by quality metrics"
+    )
+    parser.add_argument(
+        "input", type=str, nargs="+", help="Path to input dataset files"
+    )
+    parser.add_argument(
+        "--format",
+        type=str,
+        default="csv",
+        help="Output format",
+        choices=["csv", "parquet"],
+    )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
 
-    # score filtering
-    parser.add_argument("--frames_min", type=int, default=None, help="filter the dataset by minimum number of frames")
-    parser.add_argument("--frames_max", type=int, default=None, help="filter the dataset by maximum number of frames")
-    parser.add_argument("--resolution_max", type=int, default=None, help="filter the dataset by maximum resolution")
-    parser.add_argument("--aes_min", type=float, default=None, help="filter the dataset by minimum aes score")
-    parser.add_argument("--flow_min", type=float, default=None, help="filter the dataset by minimum flow score")
-    parser.add_argument("--flow_max", type=float, default=None, help="filter the dataset by maximum flow score")
-    parser.add_argument("--ocr_max", type=float, default=None, help="filter the dataset by maximum ocr score")
-    parser.add_argument("--ocr_min", type=float, default=None, help="filter the dataset by minimum ocr score")
-    parser.add_argument("--fps_max", type=float, default=None, help="filter the dataset by maximum fps")
-    parser.add_argument("--fps_min", type=float, default=None, help="filter the dataset by minimum fps")
-    parser.add_argument("--lum_min", type=float, default=None, help="filter the dataset by minimum luminance score")
-    parser.add_argument("--lum_max", type=float, default=None, help="filter the dataset by maximum luminance score")
-    parser.add_argument("--blur_max", type=float, default=None, help="filter the dataset by maximum blur score")
-    parser.add_argument("--motion_min", type=float, default=None, help="filter the dataset by minimum motion score")
-    parser.add_argument("--motion_max", type=float, default=None, help="filter the dataset by maximum motion score")
+    # Video property filters
+    parser.add_argument(
+        "--frames_min", type=int, default=None, help="Minimum number of frames"
+    )
+    parser.add_argument(
+        "--frames_max", type=int, default=None, help="Maximum number of frames"
+    )
+    parser.add_argument(
+        "--resolution_max", type=int, default=None, help="Maximum resolution"
+    )
+    parser.add_argument("--fps_max", type=float, default=None, help="Maximum FPS")
+    parser.add_argument("--fps_min", type=float, default=None, help="Minimum FPS")
+
+    # Quality metric filters
+    parser.add_argument(
+        "--aes_min", type=float, default=None, help="Minimum aesthetic score"
+    )
+    parser.add_argument(
+        "--flow_min", type=float, default=None, help="Minimum optical flow score"
+    )
+    parser.add_argument(
+        "--flow_max", type=float, default=None, help="Maximum optical flow score"
+    )
+    parser.add_argument("--ocr_max", type=float, default=None, help="Maximum OCR score")
+    parser.add_argument("--ocr_min", type=float, default=None, help="Minimum OCR score")
+    parser.add_argument(
+        "--lum_min", type=float, default=None, help="Minimum luminance score"
+    )
+    parser.add_argument(
+        "--lum_max", type=float, default=None, help="Maximum luminance score"
+    )
+    parser.add_argument(
+        "--blur_max", type=float, default=None, help="Maximum blur score"
+    )
+    parser.add_argument(
+        "--motion_min", type=float, default=None, help="Minimum motion score"
+    )
+    parser.add_argument(
+        "--motion_max", type=float, default=None, help="Maximum motion score"
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
+    # Set random seeds for reproducibility
     if args.seed is not None:
         random.seed(args.seed)
         np.random.seed(args.seed)

@@ -24,6 +24,7 @@
 # pylint: disable=undefined-loop-variable
 
 import sys
+
 sys.path.append("camera_pose_annotation/base/droid_slam")
 from droid import Droid
 from lietorch import SE3
@@ -104,6 +105,7 @@ def save_full_reconstruction(
 ):
     """Save full reconstruction."""
     from pathlib import Path
+
     t = full_traj.shape[0]
     images = np.array(rgb_list[:t])  # droid.video.images[:t].cpu().numpy()
     disps = 1.0 / (np.array(senor_depth_list[:t]) + 1e-6)
@@ -130,9 +132,9 @@ def save_full_reconstruction(
     max_frames = min(1000, images.shape[0])
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    
+
     np.savez(
-        os.path.join(save_path,f"{scene_name}_droid.npz"),
+        os.path.join(save_path, f"{scene_name}_droid.npz"),
         images=np.uint8(images[:max_frames, ::-1, ...].transpose(0, 2, 3, 1)),
         depths=np.float32(1.0 / disps[:max_frames, ...]),
         intrinsic=K,
@@ -179,7 +181,6 @@ def main():
 
     rgb_list = []
     senor_depth_list = []
-    print('\033[91mwjh', args.dir_path, '\033[0m')
     img_path = os.path.join(args.dir_path, "img")
 
     img_list = sorted(glob.glob(os.path.join(img_path, "*.jpg")))
@@ -187,16 +188,12 @@ def main():
 
     # NOTE Mono is inverse depth, but metric-depth is depth!
     mono_disp_paths = sorted(
-        glob.glob(
-            os.path.join(args.dir_path, 'depth-anything', "*.npy")
-        )
+        glob.glob(os.path.join(args.dir_path, "depth-anything", "*.npy"))
     )
     metric_depth_paths = sorted(
-        glob.glob(
-            os.path.join(args.dir_path, 'unidepth', "*.npz")
-        )
+        glob.glob(os.path.join(args.dir_path, "unidepth", "*.npz"))
     )
-    
+
     img_0 = cv2.imread(img_list[0])
     scales = []
     shifts = []
@@ -224,19 +221,13 @@ def main():
         gt_disp[valid_mask] = 1e-2
 
         # avoid cases sky dominate entire video
-        sky_ratio = np.sum(da_disp < 0.01) / \
-            (da_disp.shape[0] * da_disp.shape[1])
+        sky_ratio = np.sum(da_disp < 0.01) / (da_disp.shape[0] * da_disp.shape[1])
         if sky_ratio > 0.5:
             non_sky_mask = da_disp > 0.01
-            gt_disp_ms = (
-                gt_disp[non_sky_mask] - np.median(gt_disp[non_sky_mask]) + 1e-8
-            )
-            da_disp_ms = (
-                da_disp[non_sky_mask] - np.median(da_disp[non_sky_mask]) + 1e-8
-            )
+            gt_disp_ms = gt_disp[non_sky_mask] - np.median(gt_disp[non_sky_mask]) + 1e-8
+            da_disp_ms = da_disp[non_sky_mask] - np.median(da_disp[non_sky_mask]) + 1e-8
             scale = np.median(gt_disp_ms / da_disp_ms)
-            shift = np.median(gt_disp[non_sky_mask] -
-                            scale * da_disp[non_sky_mask])
+            shift = np.median(gt_disp[non_sky_mask] - scale * da_disp[non_sky_mask])
         else:
             gt_disp_ms = gt_disp - np.median(gt_disp) + 1e-8
             da_disp_ms = da_disp - np.median(da_disp) + 1e-8
@@ -255,12 +246,8 @@ def main():
     print("************** UNIDEPTH FOV ", np.median(fovs))
     ff = img_0.shape[1] / (2 * np.tan(np.radians(np.median(fovs) / 2.0)))
     K = np.eye(3)
-    K[0, 0] = (
-        ff * 1.0
-    )  # pp_intrinsic[0]  * (img_0.shape[1] / (pp_intrinsic[1] * 2))
-    K[1, 1] = (
-        ff * 1.0
-    )  # pp_intrinsic[0]  * (img_0.shape[0] / (pp_intrinsic[2] * 2))
+    K[0, 0] = ff * 1.0  # pp_intrinsic[0]  * (img_0.shape[1] / (pp_intrinsic[1] * 2))
+    K[1, 1] = ff * 1.0  # pp_intrinsic[0]  * (img_0.shape[0] / (pp_intrinsic[2] * 2))
     K[0, 2] = (
         img_0.shape[1] / 2.0
     )  # pp_intrinsic[1]) * (img_0.shape[1] / (pp_intrinsic[1] * 2))
@@ -274,9 +261,7 @@ def main():
     align_scale = scales[med_idx]  # np.median(np.array(scales))
     align_shift = shifts[med_idx]  # np.median(np.array(shifts))
     normalize_scale = (
-        np.percentile(
-            (align_scale * np.array(mono_disp_list) + align_shift), 98)
-        / 2.0
+        np.percentile((align_scale * np.array(mono_disp_list) + align_shift), 98) / 2.0
     )
 
     aligns = (align_scale, align_shift, normalize_scale)
@@ -312,7 +297,7 @@ def main():
             aligns=aligns,
             K=K,
         ),
-        _opt_intr=True, # default is opt_focal
+        _opt_intr=True,  # default is opt_focal
         full_ba=True,
         scene_name=scene_name,
     )
@@ -324,8 +309,9 @@ def main():
         senor_depth_list,
         motion_prob,
         args.scene_name,
-        os.path.join(args.dir_path, 'reconstructions'),
+        os.path.join(args.dir_path, "reconstructions"),
     )
+
 
 if __name__ == "__main__":
     main()

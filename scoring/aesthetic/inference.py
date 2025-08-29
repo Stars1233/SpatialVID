@@ -1,12 +1,10 @@
+"""
+Aesthetic scoring script for video frames using CLIP and MLP models.
+Adapted from https://github.com/christophschuhmann/improved-aesthetic-predictor/blob/main/simple_inference.py
+Calculates aesthetic scores for video clips using distributed processing.
+"""
+
 # adapted from https://github.com/christophschuhmann/improved-aesthetic-predictor/blob/main/simple_inference.py
-'''
-1.If you meet the error that "Model has been downloaded but the SHA256 checksum does not not match"
-2.this error happens when the downloaded model has been corrupted for some reason.
-3.you can run "sha256sum ~/.cache/clip/ViT-L-14.pt", then output should be "b8cca3fd41ae0c99ba7e8951adf17d267cdb84cd88be6f7c2e0eca1737a03836"
-4.if not, you can delete the origin file, then run "wget -P ~/.cache/clip https://openaipublic.azureedge.net/clip/models/b8cca3fd41ae0c99ba7e8951adf17d267cdb84cd88be6f7c2e0eca1737a03836/ViT-L-14.pt"
-5.then retest the value by step3
-* the reference link is there: https://github.com/openai/CLIP/issues/338
-'''
 import argparse
 import gc
 import os
@@ -26,7 +24,8 @@ from tqdm import tqdm
 
 
 def merge_scores(gathered_list: list, meta: pd.DataFrame, column):
-    # reorder
+    """Merge aesthetic scores from all distributed processes."""
+    # Reorder results from all processes
     indices_list = list(map(lambda x: x[0], gathered_list))
     scores_list = list(map(lambda x: x[1], gathered_list))
 
@@ -39,16 +38,18 @@ def merge_scores(gathered_list: list, meta: pd.DataFrame, column):
     flat_indices = np.array(flat_indices)
     flat_scores = np.array(flat_scores)
 
-    # filter duplicates
+    # Filter duplicates from distributed processing
     unique_indices, unique_indices_idx = np.unique(flat_indices, return_index=True)
     meta.loc[unique_indices, column] = flat_scores[unique_indices_idx]
 
-    # drop indices in meta not in unique_indices
+    # Drop indices in meta not in unique_indices
     meta = meta.loc[unique_indices]
     return meta
 
 
 class VideoTextDataset(torch.utils.data.Dataset):
+    """Dataset for loading video frames for aesthetic scoring."""
+    
     def __init__(self, meta_path, fig_load_dir, transform=None):
         self.meta_path = meta_path
         self.meta = pd.read_csv(meta_path)
@@ -56,18 +57,19 @@ class VideoTextDataset(torch.utils.data.Dataset):
         self.fig_load_dir = fig_load_dir
 
     def __getitem__(self, index):
+        """Load and transform video frames for a single sample."""
         sample = self.meta.iloc[index]
 
-        # load images
+        # Load first 3 frames from video clip
         images_dir = os.path.join(self.fig_load_dir, sample["id"])
         images = sorted(glob(f"{images_dir}/img/*.jpg"))[:3]
 
-        # transform
+        # Apply CLIP preprocessing transforms
         images = [self.transform(Image.open(img).convert("RGB")) for img in images]
 
-        # stack
+        # Stack images into tensor
         images = torch.stack(images)
-        
+
         return dict(index=index, images=images)
 
     def __len__(self):
@@ -75,6 +77,8 @@ class VideoTextDataset(torch.utils.data.Dataset):
 
 
 class MLP(nn.Module):
+    """Multi-layer perceptron for aesthetic score prediction."""
+    
     def __init__(self, input_size):
         super().__init__()
         self.input_size = input_size
@@ -94,6 +98,8 @@ class MLP(nn.Module):
 
 
 class AestheticScorer(nn.Module):
+    """Combined CLIP + MLP model for aesthetic scoring."""
+    
     def __init__(self, input_size, device):
         super().__init__()
         self.mlp = MLP(input_size)
@@ -103,19 +109,30 @@ class AestheticScorer(nn.Module):
         self.to(device)
 
     def forward(self, x):
+        """Extract CLIP features and predict aesthetic scores."""
         image_features = self.clip.encode_image(x)
         image_features = F.normalize(image_features, p=2, dim=-1).float()
         return self.mlp(image_features)
 
 
 def parse_args():
+    """Parse command line arguments for aesthetic scoring."""
     parser = argparse.ArgumentParser()
     parser.add_argument("meta_path", type=str, help="Path to the input CSV file")
-    parser.add_argument("--load_num", type=int, default=4, help="Number of frames to load")
+    parser.add_argument(
+        "--load_num", type=int, default=4, help="Number of frames to load"
+    )
     parser.add_argument("--bs", type=int, default=1024, help="Batch size")
     parser.add_argument("--num_workers", type=int, default=16, help="Number of workers")
-    parser.add_argument("--fig_load_dir", type=str, required=True, help="Directory to load the extracted frames")
-    parser.add_argument("--prefetch_factor", type=int, default=3, help="Prefetch factor")
+    parser.add_argument(
+        "--fig_load_dir",
+        type=str,
+        required=True,
+        help="Directory to load the extracted frames",
+    )
+    parser.add_argument(
+        "--prefetch_factor", type=int, default=3, help="Prefetch factor"
+    )
     parser.add_argument("--skip_if_existing", action="store_true")
     args = parser.parse_args()
 
@@ -136,18 +153,23 @@ def main():
         print(f"Output meta file '{out_path}' already exists. Exit.")
         exit()
 
+    # Initialize distributed processing
     dist.init_process_group(backend="nccl", timeout=timedelta(hours=24))
     torch.cuda.set_device(dist.get_rank() % torch.cuda.device_count())
 
-    # build model
+    # Build aesthetic scoring model
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
     model = AestheticScorer(768, device)
-    model.mlp.load_state_dict(torch.load("checkpoints/aesthetic.pth", map_location=device))
+    model.mlp.load_state_dict(
+        torch.load("checkpoints/aesthetic.pth", map_location=device)
+    )
     preprocess = model.preprocess
 
-    # build dataset
-    dataset = VideoTextDataset(args.meta_path, transform=preprocess, fig_load_dir=args.fig_load_dir)
+    # Build dataset and dataloader
+    dataset = VideoTextDataset(
+        args.meta_path, transform=preprocess, fig_load_dir=args.fig_load_dir
+    )
     dataloader = DataLoader(
         dataset,
         batch_size=args.bs,
@@ -161,21 +183,24 @@ def main():
         ),
     )
 
-    # compute aesthetic scores
+    # Compute aesthetic scores for all batches
     indices_list = []
     scores_list = []
     model.eval()
-    for batch in tqdm(dataloader, disable=(dist.get_rank() != 0), position=dist.get_rank()):
+    for batch in tqdm(
+        dataloader, disable=(dist.get_rank() != 0), position=dist.get_rank()
+    ):
         indices = batch["index"]
         images = batch["images"].to(device, non_blocking=True)
 
         B = images.shape[0]
         images = rearrange(images, "B N C H W -> (B N) C H W")
 
-        # compute score
+        # Compute aesthetic scores using CLIP + MLP
         with torch.no_grad():
             scores = model(images)
 
+        # Average scores across frames for each video
         scores = rearrange(scores, "(B N) 1 -> B N", B=B)
         scores = scores.mean(dim=1)
         scores_np = scores.to(torch.float32).cpu().numpy()
@@ -183,9 +208,10 @@ def main():
         indices_list.extend(indices.tolist())
         scores_list.extend(scores_np.tolist())
 
-    # wait for all ranks to finish data processing
+    # Wait for all ranks to finish data processing
     dist.barrier()
 
+    # Gather results from all processes and save
     torch.cuda.empty_cache()
     gc.collect()
     gathered_list = [None] * dist.get_world_size()

@@ -1,3 +1,8 @@
+"""
+Luminance analysis script for video frames using distributed processing.
+Calculates mean, min, and max luminance scores for video clips using PyTorch distributed computing.
+"""
+
 import argparse
 import os
 import gc
@@ -14,7 +19,8 @@ from tqdm import tqdm
 
 
 def merge_scores(gathered_list: list, meta: pd.DataFrame):
-    # reorder
+    """Merge luminance scores from all distributed processes."""
+    # Reorder results from all processes
     indices_list = list(map(lambda x: x[0], gathered_list))
     mean_scores_list = list(map(lambda x: x[1], gathered_list))
     min_scores_list = list(map(lambda x: x[2], gathered_list))
@@ -37,33 +43,37 @@ def merge_scores(gathered_list: list, meta: pd.DataFrame):
     flat_min_scores = np.array(flat_min_scores)
     flat_max_scores = np.array(flat_max_scores)
 
-    # filter duplicates
+    # Filter duplicates from distributed processing
     unique_indices, unique_indices_idx = np.unique(flat_indices, return_index=True)
     meta.loc[unique_indices, "lum_mean"] = flat_mean_scores[unique_indices_idx]
     meta.loc[unique_indices, "lum_min"] = flat_min_scores[unique_indices_idx]
     meta.loc[unique_indices, "lum_max"] = flat_max_scores[unique_indices_idx]
 
-    # drop indices in meta not in unique_indices
+    # Drop indices in meta not in unique_indices
     meta = meta.loc[unique_indices]
     return meta
 
 
 class VideoDataset(torch.utils.data.Dataset):
     """Dataset to handle video luminance computation."""
+
     def __init__(self, meta_path, fig_load_dir):
         self.meta_path = meta_path
         self.meta = pd.read_csv(meta_path)
         self.fig_load_dir = fig_load_dir
 
     def __getitem__(self, index):
+        """Get video frames and compute luminance for a single sample."""
         sample = self.meta.iloc[index]
 
-        # load images
+        # Load first 3 frames from video clip
         images_dir = os.path.join(self.fig_load_dir, sample["id"])
         images = sorted(glob(f"{images_dir}/img/*.jpg"))[:3]
-        
-        # transform
-        images = torch.stack([pil_to_tensor(Image.open(img).convert("RGB")) for img in images])
+
+        # Transform images to tensors
+        images = torch.stack(
+            [pil_to_tensor(Image.open(img).convert("RGB")) for img in images]
+        )
 
         return {"index": index, "images": images}
 
@@ -72,11 +82,17 @@ class VideoDataset(torch.utils.data.Dataset):
 
 
 def parse_args():
+    """Parse command line arguments for luminance analysis."""
     parser = argparse.ArgumentParser()
     parser.add_argument("meta_path", type=str, help="Path to the input CSV file")
     parser.add_argument("--bs", type=int, default=4, help="Batch size")
     parser.add_argument("--num_workers", type=int, default=16, help="Number of workers")
-    parser.add_argument("--fig_load_dir", type=str, required=True, help="Directory to load the extracted frames")
+    parser.add_argument(
+        "--fig_load_dir",
+        type=str,
+        required=True,
+        help="Directory to load the extracted frames",
+    )
     parser.add_argument("--skip_if_existing", action="store_true")
     return parser.parse_args()
 
@@ -94,30 +110,43 @@ def main():
         print(f"Output '{output_path}' already exists. Exiting.")
         return
 
+    # Initialize distributed processing
     dist.init_process_group(backend="nccl", timeout=timedelta(hours=24))
-    torch.cuda.set_device(dist.get_rank() % torch.cuda.device_count()) if torch.cuda.is_available() else None
+    (
+        torch.cuda.set_device(dist.get_rank() % torch.cuda.device_count())
+        if torch.cuda.is_available()
+        else None
+    )
 
-    dataset = VideoDataset(meta_path, fig_load_dir = args.fig_load_dir)
+    # Setup dataset and distributed dataloader
+    dataset = VideoDataset(meta_path, fig_load_dir=args.fig_load_dir)
     dataloader = DataLoader(
         dataset,
         batch_size=args.bs,
         num_workers=args.num_workers,
-        sampler=DistributedSampler(dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank()),
+        sampler=DistributedSampler(
+            dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank()
+        ),
     )
 
+    # Process batches and calculate luminance scores
     indices_list = []
     mean_scores_list = []
     max_scores_list = []
     min_scores_list = []
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    for batch in tqdm(dataloader, disable=(dist.get_rank() != 0), position=dist.get_rank()):
+    for batch in tqdm(
+        dataloader, disable=(dist.get_rank() != 0), position=dist.get_rank()
+    ):
         indices = batch["index"]
-        images = batch["images"].to(device, non_blocking=True) # [B, N, C, H, W]
+        images = batch["images"].to(device, non_blocking=True)  # [B, N, C, H, W]
 
+        # Calculate luminance using standard RGB weights
         R, G, B = images[:, :, 0], images[:, :, 1], images[:, :, 2]
         luminance = 0.2126 * R + 0.7152 * G + 0.0722 * B
         scores = luminance.mean(dim=[2, 3])
 
+        # Compute statistics across frames
         mean_scores = scores.mean(dim=1).cpu().numpy()
         max_scores = scores.max(dim=1)[0].cpu().numpy()
         min_scores = scores.min(dim=1)[0].cpu().numpy()
@@ -127,13 +156,17 @@ def main():
         max_scores_list.extend(max_scores.tolist())
         min_scores_list.extend(min_scores.tolist())
 
-    # wait for all ranks to finish data processing
+    # Wait for all ranks to finish data processing
     dist.barrier()
 
+    # Gather results from all processes and save
     torch.cuda.empty_cache()
     gc.collect()
     gathered_list = [None] * dist.get_world_size()
-    dist.all_gather_object(gathered_list, (indices_list, mean_scores_list, min_scores_list, max_scores_list))
+    dist.all_gather_object(
+        gathered_list,
+        (indices_list, mean_scores_list, min_scores_list, max_scores_list),
+    )
     if dist.get_rank() == 0:
         meta_new = merge_scores(gathered_list, dataset.meta)
         meta_new.to_csv(output_path, index=False)

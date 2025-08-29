@@ -53,53 +53,47 @@ def resize_flow(flow, img_h, img_w):
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--model", default="raft-things.pth", help="restore checkpoint")
+    parser.add_argument("--small", action="store_true", help="use small model")
+    parser.add_argument("--dir_path", help="dataset for evaluation")
     parser.add_argument(
-        '--model', default='raft-things.pth', help='restore checkpoint'
-    )
-    parser.add_argument('--small', action='store_true', help='use small model')
-    parser.add_argument('--dir_path', help='dataset for evaluation')
-    parser.add_argument(
-        '--num_heads',
+        "--num_heads",
         default=1,
         type=int,
-        help='number of heads in attention and aggregation',
+        help="number of heads in attention and aggregation",
     )
     parser.add_argument(
-        '--position_only',
+        "--position_only",
         default=False,
-        action='store_true',
-        help='only use position-wise attention',
+        action="store_true",
+        help="only use position-wise attention",
     )
     parser.add_argument(
-        '--position_and_content',
+        "--position_and_content",
         default=False,
-        action='store_true',
-        help='use position and content-wise attention',
+        action="store_true",
+        help="use position and content-wise attention",
     )
     parser.add_argument(
-        '--mixed_precision', action='store_true', help='use mixed precision'
+        "--mixed_precision", action="store_true", help="use mixed precision"
     )
 
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
 
     model = torch.nn.DataParallel(RAFT(args))
     model.load_state_dict(torch.load(args.model))
     flow_model = model.module
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     flow_model.to(device).eval()
 
-    img_path = os.path.join(args.dir_path, 'img')
+    img_path = os.path.join(args.dir_path, "img")
 
-    image_list = sorted(
-        glob.glob(os.path.join(img_path, '*.png'))
-    )  # [::stride]
-    image_list += sorted(
-        glob.glob(os.path.join(img_path, '*.jpg'))
-    )  # [::stride]
+    image_list = sorted(glob.glob(os.path.join(img_path, "*.png")))  # [::stride]
+    image_list += sorted(glob.glob(os.path.join(img_path, "*.jpg")))  # [::stride]
     img_data = []
 
     for t, (image_file) in tqdm.tqdm(enumerate(image_list)):
@@ -131,14 +125,12 @@ if __name__ == '__main__':
         flows_arr_low = []
         for i in tqdm.tqdm(range(max(0, -step), img_data.shape[0] - max(0, step))):
             image1 = (
-                torch.as_tensor(np.ascontiguousarray(img_data[i: i + 1]))
+                torch.as_tensor(np.ascontiguousarray(img_data[i : i + 1]))
                 .float()
                 .cuda()
             )
             image2 = (
-                torch.as_tensor(
-                    np.ascontiguousarray(img_data[i + step: i + step + 1])
-                )
+                torch.as_tensor(np.ascontiguousarray(img_data[i + step : i + step + 1]))
                 .float()
                 .cuda()
             )
@@ -185,8 +177,7 @@ if __name__ == '__main__':
                 )
 
                 bwd2fwd_flow = warp_flow(flow_up_bwd, flow_up_fwd)
-                fwd_lr_error = np.linalg.norm(
-                    flow_up_fwd + bwd2fwd_flow, axis=-1)
+                fwd_lr_error = np.linalg.norm(flow_up_fwd + bwd2fwd_flow, axis=-1)
                 fwd_mask_up = fwd_lr_error < 1.0
 
                 # flows_arr_low.append(flow_low_fwd)
@@ -200,17 +191,11 @@ if __name__ == '__main__':
     iijj = np.stack((ii, jj), axis=0)
     flows_high = np.array(flows_arr_up).transpose(0, 3, 1, 2)
     flow_masks_high = np.array(masks_arr_up)[:, None, ...]
-    
+
     output_path = os.path.join(args.dir_path, "cache-flow")
     if not os.path.exists(output_path):
         os.makedirs(output_path)
-    
-    np.save(
-        os.path.join(output_path, 'flows.npy'), np.float16(flows_high)
-    )
-    np.save(
-        os.path.join(output_path, 'flows_masks.npy'), flow_masks_high
-    )
-    np.save(
-        os.path.join(output_path, 'ii-jj.npy'), iijj
-    )
+
+    np.save(os.path.join(output_path, "flows.npy"), np.float16(flows_high))
+    np.save(os.path.join(output_path, "flows_masks.npy"), flow_masks_high)
+    np.save(os.path.join(output_path, "ii-jj.npy"), iijj)

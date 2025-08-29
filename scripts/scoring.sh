@@ -47,10 +47,9 @@ CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 1.2 python utils/get_inf
 # Also, you can set the params like "--start-remove-sec 0.5 --end-remove-sec 0.5"
 CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 2.1 python utils/scene_detect.py ${ROOT_META}/meta_info.csv \
   --num_workers 64 \
-  --detect_id 7 \
   --frame_skip 2\
   --start_remove_sec 0.3 --end_remove_sec 0.3 \
-  --min_seconds 2 --max_seconds 15
+  --min_seconds 3 --max_seconds 15
 
 # 2.2 Get clips. This should output ${ROOT_META}/clips_info.csv
 CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 2.2 python utils/get_clip.py ${ROOT_META}/meta_info_timestamp.csv \
@@ -96,6 +95,5 @@ CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 5 python utils/filter.py
 
 # 6 Cut the clips.
 CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 6 python utils/cut.py ${ROOT_META}/filtered_clips.csv \
-  --ffmpeg_path ffmpeg \
   --video_save_dir ${ROOT_CLIPS} --csv_save_dir ${ROOT_META} \
   --num_workers $((GPU_NUM * 4)) --gpu_num $GPU_NUM

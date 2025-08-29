@@ -1,3 +1,7 @@
+"""
+Video cutting utility using FFmpeg with GPU acceleration support.
+"""
+
 import argparse
 import os
 import queue
@@ -8,39 +12,43 @@ import subprocess
 from scenedetect import FrameTimecode
 from tqdm import tqdm
 
-def get_ffmpeg_acceleration():
-    """
-    auto detect the best acceleration method
-    NVIDIA > CPU。
-    """
-    try:
-        # get the list of available encoders
-        output = subprocess.check_output(["ffmpeg", "-encoders"], stderr=subprocess.DEVNULL).decode("utf-8")
+# Default FFmpeg installation path
+FFMPEG_PATH = "/usr/local/bin/ffmpeg"
 
-        if "hevc_nvenc" in output:  # NVIDIA GPU
+
+def get_ffmpeg_acceleration():
+    """Auto-detect FFmpeg acceleration: NVIDIA GPU > CPU"""
+    try:
+        output = subprocess.check_output(
+            [FFMPEG_PATH, "-encoders"], stderr=subprocess.DEVNULL
+        ).decode("utf-8")
+        if "hevc_nvenc" in output:
             return "nvidia"
         else:
-            return "cpu"  # use CPU
+            return "cpu"
     except Exception as e:
         print(f"FFmpeg acceleration detection failed: {e}")
         return "cpu"
 
 
+# Detect and set the acceleration type
 ACCELERATION_TYPE = get_ffmpeg_acceleration()
 print(f"FFmpeg acceleration type: {ACCELERATION_TYPE}")
 
 
 def process_single_row(row, args, process_id):
+    """Process a single video row to extract clip using FFmpeg"""
     video_path = row["video_path"]
-
     save_dir = args.video_save_dir
 
+    # Skip resizing if video is already smaller (no upscaling)
     shorter_size = args.shorter_size
     if (shorter_size is not None) and ("height" in row) and ("width" in row):
         min_size = min(row["height"], row["width"])
         if min_size <= shorter_size:
             shorter_size = None
 
+    # Parse timestamps
     seg_start = FrameTimecode(timecode=row["timestamp_start"], fps=row["fps"])
     seg_end = FrameTimecode(timecode=row["timestamp_end"], fps=row["fps"])
 
@@ -48,62 +56,59 @@ def process_single_row(row, args, process_id):
 
     save_path = os.path.join(save_dir, f"{id}.mp4")
     if os.path.exists(save_path):
-        # 将原本的video_path替换为save_path
+        # Use existing clip
         row["video_path"] = save_path
     else:
         try:
-            # 构建输入流
-            cmd = [
-                args.ffmpeg_path,
-                "-nostdin",
-                "-y"
-            ]
+            # Build FFmpeg command
+            cmd = [FFMPEG_PATH, "-nostdin", "-y"]
+            # GPU acceleration setup
             if ACCELERATION_TYPE == "nvidia":
                 cmd += [
-                    "-hwaccel", "cuda",
-                    "-hwaccel_output_format", "cuda",
-                    "-hwaccel_device", str(process_id % args.gpu_num),
+                    "-hwaccel",
+                    "cuda",
+                    "-hwaccel_output_format",
+                    "cuda",
+                    "-hwaccel_device",
+                    str(process_id % args.gpu_num),
                 ]
-                
+
+            # Input and time range
             cmd += [
-                "-i", video_path,
-                "-ss", str(seg_start.get_seconds()),
-                "-to", str(seg_end.get_seconds())
+                "-i",
+                video_path,
+                "-ss",
+                str(seg_start.get_seconds()),
+                "-to",
+                str(seg_end.get_seconds()),
             ]
 
+            # Video encoder
             if ACCELERATION_TYPE == "nvidia":
-                cmd += [
-                    "-c:v", "hevc_nvenc",
-                    "-preset", "fast"
-                ]
+                cmd += ["-c:v", "hevc_nvenc", "-preset", "fast"]
             else:
-                cmd += [
-                    "-c:v", "libx264",
-                    "-preset", "fast"
-                ]
+                cmd += ["-c:v", "libx264", "-preset", "fast"]
 
+            # Frame rate
             if args.target_fps is not None:
-                cmd += [
-                    "-r", str(args.target_fps)
-                ]
+                cmd += ["-r", str(args.target_fps)]
 
+            # Video scaling
             if shorter_size is not None:
                 if ACCELERATION_TYPE == "nvidia":
                     cmd += [
-                        "-vf", f"scale_cuda='if(gt(iw,ih),-2,{shorter_size})':'if(gt(iw,ih),{shorter_size},-2)'"
+                        "-vf",
+                        f"scale_cuda='if(gt(iw,ih),-2,{shorter_size})':'if(gt(iw,ih),{shorter_size},-2)'",
                     ]
                 else:
                     cmd += [
-                        "-vf", f"scale='if(gt(iw,ih),-2,{shorter_size})':'if(gt(iw,ih),{shorter_size},-2)'"
+                        "-vf",
+                        f"scale='if(gt(iw,ih),-2,{shorter_size})':'if(gt(iw,ih),{shorter_size},-2)'",
                     ]
 
-            cmd += [
-                "-map", "0:v",
-                save_path
-                ]
+            cmd += ["-map", "0:v", save_path]
 
             subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
-
             row["video_path"] = save_path
         except subprocess.CalledProcessError as e:
             print(f"ffmpeg command failed: {e.stderr.decode('utf-8')}")
@@ -112,21 +117,49 @@ def process_single_row(row, args, process_id):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("meta_path", type=str)
-    parser.add_argument("--video_save_dir", type=str, required=True, help="Directory to save the video clips")
-    parser.add_argument("--csv_save_dir", type=str, required=True, help="Directory to save the CSV file")
-    parser.add_argument("--ffmpeg_path", type=str, default="ffmpeg", help="Path to the ffmpeg executable")
-    parser.add_argument("--target_fps", type=int, default=None, help="target fps of clips")
-    parser.add_argument("--shorter_size", type=int, default=None, help="resize the shorter size by keeping ratio; will not do upscale")
-    parser.add_argument("--num_workers", type=int, default=None, help="#workers for concurrent.futures")
-    parser.add_argument("--disable_parallel", action="store_true", help="disable parallel processing")
-    parser.add_argument("--drop_invalid_timestamps", action="store_true", help="drop rows with invalid timestamps")
-    parser.add_argument("--gpu_num", type=int, default=1, help="gpu number")
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description="Cut video clips from source videos")
+    parser.add_argument("meta_path", type=str, help="Path to metadata CSV file")
+    parser.add_argument(
+        "--video_save_dir",
+        type=str,
+        required=True,
+        help="Directory to save video clips",
+    )
+    parser.add_argument(
+        "--csv_save_dir", type=str, required=True, help="Directory to save CSV file"
+    )
+    parser.add_argument(
+        "--target_fps", type=int, default=None, help="Target fps of output clips"
+    )
+    parser.add_argument(
+        "--shorter_size",
+        type=int,
+        default=None,
+        help="Resize shorter side keeping aspect ratio",
+    )
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=None,
+        help="Number of workers for parallel processing",
+    )
+    parser.add_argument(
+        "--disable_parallel", action="store_true", help="Disable parallel processing"
+    )
+    parser.add_argument(
+        "--drop_invalid_timestamps",
+        action="store_true",
+        help="Drop rows with invalid timestamps",
+    )
+    parser.add_argument(
+        "--gpu_num", type=int, default=1, help="Number of GPUs available"
+    )
     return parser.parse_args()
 
 
 def worker(task_queue, results_queue, args, process_id):
+    """Worker function for parallel video processing"""
     while True:
         try:
             index, row = task_queue.get(timeout=1)
@@ -138,6 +171,7 @@ def worker(task_queue, results_queue, args, process_id):
 
 
 def main():
+    """Main function to process video cutting"""
     args = parse_args()
     meta_path = args.meta_path
     if not os.path.exists(meta_path):
@@ -149,7 +183,9 @@ def main():
 
     meta = pd.read_csv(args.meta_path)
 
+    # Setup multiprocessing
     from multiprocessing import Manager
+
     manager = Manager()
     task_queue = manager.Queue()
     results_queue = manager.Queue()
@@ -161,23 +197,31 @@ def main():
 
     if args.disable_parallel:
         results = []
-        for index, row in tqdm(meta.iterrows(), total=len(meta), desc="Processing rows"):
+        for index, row in tqdm(
+            meta.iterrows(), total=len(meta), desc="Processing rows"
+        ):
             result = process_single_row_partial(row, index)
             results.append(result)
     else:
-        if args.num_workers is not None:
-            num_workers = args.num_workers
-        else:
-            num_workers = os.cpu_count()
+        num_workers = args.num_workers if args.num_workers else os.cpu_count()
 
-        with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=num_workers
+        ) as executor:
             futures = []
             for id in range(num_workers):
-                futures.append(executor.submit(worker, task_queue, results_queue, args, id))
+                futures.append(
+                    executor.submit(worker, task_queue, results_queue, args, id)
+                )
 
-            for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Finished workers"):
+            for future in tqdm(
+                concurrent.futures.as_completed(futures),
+                total=len(futures),
+                desc="Finished workers",
+            ):
                 future.result()
 
+    # Collect results
     results = []
     while not results_queue.empty():
         results.append(results_queue.get())
@@ -194,11 +238,16 @@ def main():
     if args.drop_invalid_timestamps:
         meta = meta[valid_rows]
         assert args.meta_path.endswith("timestamp.csv"), "Only support *timestamp.csv"
-        meta.to_csv(args.meta_path.replace("timestamp.csv", "correct_timestamp.csv"), index=False)
-        print(f"Corrected timestamp file saved to '{args.meta_path.replace('timestamp.csv', 'correct_timestamp.csv')}'")
+        meta.to_csv(
+            args.meta_path.replace("timestamp.csv", "correct_timestamp.csv"),
+            index=False,
+        )
+        print(
+            f"Corrected timestamp file saved to '{args.meta_path.replace('timestamp.csv', 'correct_timestamp.csv')}'"
+        )
 
-    # 创建新的 DataFrame 并保存为 CSV 文件
-    columns = meta.columns  # 获取原始 DataFrame 的列名
+    # Save results to CSV
+    columns = meta.columns
     new_df = pd.DataFrame(new_rows, columns=columns)
     new_csv_path = os.path.join(args.csv_save_dir, "clips.csv")
     new_df.to_csv(new_csv_path, index=False)

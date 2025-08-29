@@ -53,6 +53,10 @@ SpatialVid is a large-scale and high-quality video dataset designed for
 
    Ignore the warning about `nvidia-nccl-cu12` version, it is not a problem.
 
+   About FFMPEG ？
+
+   Replace the `FFMPEG_PATH` variable in the [`scoring/motion/inference.py`](scoring/motion/inference.py) and [`utils/cut.py`](utils/cut.py) with the actual path to your ffmpeg executable, default is `/usr/local/bin/ffmpeg`.
+
    [Optional] if your videos are in av1 codec instead of h264, you need to install ffmpeg (already in our requirement script), then run the following to make conda support av1 codec:
 
    ```bash

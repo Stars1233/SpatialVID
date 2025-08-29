@@ -1,3 +1,7 @@
+"""
+Video reading utilities with memory optimization and multiple backend support.
+"""
+
 import gc
 import math
 import os
@@ -24,55 +28,41 @@ def read_video_av(
     output_format: str = "THWC",
 ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]]:
     """
-    Reads a video from a file, returning both the video frames and the audio frames
-
-    This method is modified from torchvision.io.video.read_video, with the following changes:
-
-    1. will not extract audio frames and return empty for aframes
-    2. remove checks and only support pyav
-    3. add container.close() and gc.collect() to avoid thread leakage
-    4. try our best to avoid memory leak
-
-    Args:
-        filename (str): path to the video file
-        start_pts (int if pts_unit = 'pts', float / Fraction if pts_unit = 'sec', optional):
-            The start presentation time of the video
-        end_pts (int if pts_unit = 'pts', float / Fraction if pts_unit = 'sec', optional):
-            The end presentation time
-        pts_unit (str, optional): unit in which start_pts and end_pts values will be interpreted,
-            either 'pts' or 'sec'. Defaults to 'pts'.
-        output_format (str, optional): The format of the output video tensors. Can be either "THWC" (default) or "TCHW".
-
-    Returns:
-        vframes (Tensor[T, H, W, C] or Tensor[T, C, H, W]): the `T` video frames
-        aframes (Tensor[K, L]): the audio frames, where `K` is the number of channels and `L` is the number of points
-        info (Dict): metadata for the video and audio. Can contain the fields video_fps (float) and audio_fps (int)
+    Read video frames using PyAV backend with memory optimization.
+    
+    Modified from torchvision.io.video.read_video with improvements:
+    - No audio extraction (returns empty aframes)
+    - PyAV backend only
+    - Added container.close() and gc.collect() to prevent memory leaks
+    - Optimized for memory efficiency
     """
-    # format
+    # Validate format
     output_format = output_format.upper()
     if output_format not in ("THWC", "TCHW"):
         raise ValueError(f"output_format should be either 'THWC' or 'TCHW', got {output_format}.")
-    # file existence
+    
+    # Check file existence
     if not os.path.exists(filename):
         raise RuntimeError(f"File not found: {filename}")
-    # backend check
+    
+    # Validate backend
     assert get_video_backend() == "pyav", "pyav backend is required for read_video_av"
     _check_av_available()
-    # end_pts check
+    
+    # Validate time range
     if end_pts is None:
         end_pts = float("inf")
     if end_pts < start_pts:
         raise ValueError(f"end_pts should be larger than start_pts, got start_pts={start_pts} and end_pts={end_pts}")
 
-    # == get video info ==
+    # Extract video metadata
     info = {}
-    # TODO: creating an container leads to memory leak (1G for 8 workers 1 GPU)
     container = av.open(filename, metadata_errors="ignore")
-    # fps
     video_fps = container.streams.video[0].average_rate
-    # guard against potentially corrupted files
     if video_fps is not None:
         info["video_fps"] = float(video_fps)
+    
+    # Get frame dimensions
     iter_video = container.decode(**{"video": 0})
     frame = next(iter_video).to_rgb().to_ndarray()
     height, width = frame.shape[:2]
@@ -83,14 +73,11 @@ def read_video_av(
     container.close()
     del container
 
-    # HACK: must create before iterating stream
-    # use np.zeros will not actually allocate memory
-    # use np.ones will lead to a little memory leak
+    # Pre-allocate frame buffer (np.zeros doesn't actually allocate memory)
     video_frames = np.zeros((total_frames, height, width, 3), dtype=np.uint8)
 
-    # == read ==
+    # Read video frames
     try:
-        # TODO: The reading has memory leak (4G for 8 workers 1 GPU)
         container = av.open(filename, metadata_errors="ignore")
         assert container.streams.video is not None
         video_frames = _read_from_stream(
@@ -106,10 +93,11 @@ def read_video_av(
     except av.AVError as e:
         print(f"[Warning] Error while reading video {filename}: {e}")
 
+    # Convert to tensor and adjust format
     vframes = torch.from_numpy(video_frames).clone()
     del video_frames
     if output_format == "TCHW":
-        # [T,H,W,C] --> [T,C,H,W]
+        # Convert [T,H,W,C] to [T,C,H,W]
         vframes = vframes.permute(0, 3, 1, 2)
 
     aframes = torch.empty((1, 0), dtype=torch.float32)
@@ -126,26 +114,21 @@ def _read_from_stream(
     stream_name: Dict[str, Optional[Union[int, Tuple[int, ...], List[int]]]],
     filename: Optional[str] = None,
 ) -> List["av.frame.Frame"]:
+    """Read frames from video stream with proper buffering and seeking"""
+    # Convert time units
     if pts_unit == "sec":
-        # TODO: we should change all of this from ground up to simply take
-        # sec and convert to MS in C++
         start_offset = int(math.floor(start_offset * (1 / stream.time_base)))
         if end_offset != float("inf"):
             end_offset = int(math.ceil(end_offset * (1 / stream.time_base)))
     else:
         warnings.warn("The pts_unit 'pts' gives wrong results. Please use pts_unit 'sec'.")
 
+    # Check if buffering is needed for DivX packed B-frames
     should_buffer = True
     max_buffer_size = 5
     if stream.type == "video":
-        # DivX-style packed B-frames can have out-of-order pts (2 frames in a single pkt)
-        # so need to buffer some extra frames to sort everything
-        # properly
         extradata = stream.codec_context.extradata
-        # overly complicated way of finding if `divx_packed` is set, following
-        # https://github.com/FFmpeg/FFmpeg/commit/d5a21172283572af587b3d939eba0091484d3263
         if extradata and b"DivX" in extradata:
-            # can't use regex directly because of some weird characters sometimes...
             pos = extradata.find(b"DivX")
             d = extradata[pos:]
             o = re.search(rb"DivX(\d+)Build(\d+)(\w)", d)
@@ -153,21 +136,21 @@ def _read_from_stream(
                 o = re.search(rb"DivX(\d+)b(\d+)(\w)", d)
             if o is not None:
                 should_buffer = o.group(3) == b"p"
+    
+    # Calculate seek offset with safety margin
     seek_offset = start_offset
-    # some files don't seek to the right location, so better be safe here
-    seek_offset = max(seek_offset - 1, 0)
+    seek_offset = max(seek_offset - 1, 0)  # Safety margin for seeking
     if should_buffer:
-        # FIXME this is kind of a hack, but we will jump to the previous keyframe
-        # so this will be safe
         seek_offset = max(seek_offset - max_buffer_size, 0)
+    
+    # Seek to start position
     try:
-        # TODO check if stream needs to always be the video stream here or not
         container.seek(seek_offset, any_frame=False, backward=True, stream=stream)
     except av.AVError as e:
         print(f"[Warning] Error while seeking video {filename}: {e}")
         return []
 
-    # == main ==
+    # Read frames from stream
     buffer_count = 0
     frames_pts = []
     cnt = 0
@@ -186,11 +169,10 @@ def _read_from_stream(
     except av.AVError as e:
         print(f"[Warning] Error while reading video {filename}: {e}")
 
-    # garbage collection for thread leakage
+    # Clean up resources to prevent memory leaks
     container.close()
     del container
-    # NOTE: manually garbage collect to close pyav threads
-    gc.collect()
+    gc.collect()  # Force garbage collection for PyAV threads
 
     # ensure that the results are sorted wrt the pts
     # NOTE: here we assert frames_pts is sorted
@@ -210,49 +192,67 @@ def _read_from_stream(
     return result
 
 
-def read_video_cv2(video_path):
-    cap = cv2.VideoCapture(video_path)
-
-    if not cap.isOpened():
-        # print("Error: Unable to open video")
-        raise ValueError
+def read_video_cv2(filename, start_pts=None, end_pts=None, pts_unit="pts"):
+    """
+    Read video using OpenCV backend.
+    """
+    if pts_unit != "frames":
+        warnings.warn("Using pts_unit other than 'frames' is not supported for cv2 backend")
+    
+    cap = cv2.VideoCapture(filename)
+    
+    # Get video metadata
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    # Calculate frame range
+    if start_pts is None:
+        start_pts = 0
+    if end_pts is None:
+        end_pts = frame_count
+    
+    # Limit frame range to video bounds
+    start_pts = max(0, start_pts)
+    end_pts = min(frame_count, end_pts)
+    num_frames = end_pts - start_pts
+    
+    if num_frames <= 0:
+        return torch.zeros(0, 3, 0, 0), None, {"video_fps": fps}
+    
+    # Seek to start frame
+    cap.set(cv2.CAP_PROP_POS_FRAMES, start_pts)
+    
+    # Read frames
+    frames = []
+    for i in range(num_frames):
+        ret, frame = cap.read()
+        if not ret:
+            break
+        # Convert BGR to RGB and change HWC to CHW format
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = torch.from_numpy(frame).permute(2, 0, 1).float()
+        frames.append(frame)
+    
+    cap.release()
+    
+    if frames:
+        video_tensor = torch.stack(frames)
     else:
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        vinfo = {
-            "video_fps": fps,
-        }
-
-        frames = []
-        while True:
-            # Read a frame from the video
-            ret, frame = cap.read()
-
-            # If frame is not read correctly, break the loop
-            if not ret:
-                break
-
-            frames.append(frame[:, :, ::-1])  # BGR to RGB
-
-            # Exit if 'q' is pressed
-            if cv2.waitKey(25) & 0xFF == ord("q"):
-                break
-
-        # Release the video capture object and close all windows
-        cap.release()
-        cv2.destroyAllWindows()
-
-        frames = np.stack(frames)
-        frames = torch.from_numpy(frames)  # [T, H, W, C=3]
-        frames = frames.permute(0, 3, 1, 2)
-        return frames, vinfo
+        video_tensor = torch.zeros(0, 3, 0, 0)
+    
+    metadata = {"video_fps": fps}
+    return video_tensor, None, metadata
 
 
 def read_video(video_path, backend="av"):
+    """
+    Read video using specified backend.
+    """
     if backend == "cv2":
         vframes, vinfo = read_video_cv2(video_path)
     elif backend == "av":
         vframes, _, vinfo = read_video_av(filename=video_path, pts_unit="sec", output_format="TCHW")
     else:
-        raise ValueError
+        raise ValueError(f"Unsupported backend: {backend}")
 
     return vframes, vinfo

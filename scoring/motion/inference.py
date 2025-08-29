@@ -1,3 +1,8 @@
+"""
+Motion analysis script for video quality assessment using FFmpeg and VMAF.
+Calculates motion scores for video clips using hardware acceleration when available.
+"""
+
 import os
 import argparse
 import pandas as pd
@@ -7,51 +12,69 @@ import queue
 import concurrent.futures
 from tqdm import tqdm
 
-FFMPEG_PATH = '/usr/local/bin/ffmpeg'
+FFMPEG_PATH = "/usr/local/bin/ffmpeg"
+
 
 def get_ffmpeg_acceleration():
     """
-    auto detect the best acceleration method
-    NVIDIA > CPU。
+    Auto detect the best acceleration method.
+    Priority: NVIDIA GPU > CPU.
     """
     try:
-        # get the list of ffmpeg configuration
-        output = subprocess.check_output([FFMPEG_PATH, '-version'], stderr=subprocess.DEVNULL).decode("utf-8")
+        # Get the list of ffmpeg configuration
+        output = subprocess.check_output(
+            [FFMPEG_PATH, "-version"], stderr=subprocess.DEVNULL
+        ).decode("utf-8")
 
         if "--enable-cuda-nvcc" and "--enable-libvmaf" in output:  # NVIDIA GPU
             return "nvidia"
         else:
-            return "cpu"  # use CPU
+            return "cpu"  # Use CPU
     except Exception as e:
         print(f"FFmpeg acceleration detection failed: {e}")
         return "cpu"
 
+
 ACCELERATION_TYPE = get_ffmpeg_acceleration()
 print(f"FFmpeg acceleration type: {ACCELERATION_TYPE}")
 
-def process_single_row(video_path, args, process_id):
-    path = os.path.join(args.temp_save_dir, os.path.basename(video_path).split('.')[0] + '.csv')
 
+def process_single_row(video_path, args, process_id):
+    """Process a single video to generate motion analysis CSV using FFmpeg."""
+    path = os.path.join(
+        args.temp_save_dir, os.path.basename(video_path).split(".")[0] + ".csv"
+    )
+
+    # Build FFmpeg command with appropriate acceleration
     command = [FFMPEG_PATH]
     if ACCELERATION_TYPE == "nvidia":
-        command +=[
-            '-hwaccel', 'cuda',
-            '-hwaccel_output_format', 'cuda',
-            '-hwaccel_device', f'{process_id % args.gpu_num}'
+        command += [
+            "-hwaccel",
+            "cuda",
+            "-hwaccel_output_format",
+            "cuda",
+            "-hwaccel_device",
+            f"{process_id % args.gpu_num}",
         ]
-    command += ['-i', f'{video_path}']
+    command += ["-i", f"{video_path}"]
     if ACCELERATION_TYPE == "nvidia":
-        command +=[
-            '-hwaccel', 'cuda',
-            '-hwaccel_output_format', 'cuda',
-            '-hwaccel_device', f'{process_id % args.gpu_num}'
+        command += [
+            "-hwaccel",
+            "cuda",
+            "-hwaccel_output_format",
+            "cuda",
+            "-hwaccel_device",
+            f"{process_id % args.gpu_num}",
         ]
-    command += ['-i', f'{video_path}']
+    command += ["-i", f"{video_path}"]
     if ACCELERATION_TYPE == "nvidia":
-        command += ['-filter_complex', f'[0:v]scale_cuda=format=yuv420p[dis],[1:v]scale_cuda=format=yuv420p[ref],[dis][ref]libvmaf_cuda=log_fmt=csv:log_path={path}']
+        command += [
+            "-filter_complex",
+            f"[0:v]scale_cuda=format=yuv420p[dis],[1:v]scale_cuda=format=yuv420p[ref],[dis][ref]libvmaf_cuda=log_fmt=csv:log_path={path}",
+        ]
     else:
-        command += ['-lavfi', f'libvmaf=log_fmt=csv:log_path={path}']
-    command += ['-f', 'null', '-']
+        command += ["-lavfi", f"libvmaf=log_fmt=csv:log_path={path}"]
+    command += ["-f", "null", "-"]
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
@@ -59,14 +82,16 @@ def process_single_row(video_path, args, process_id):
 
 
 def calculate_score(row, args):
+    """Calculate motion score for a specific video clip segment."""
     csv_path = os.path.join(args.temp_save_dir, f'{row["id_ori"]}.csv')
     df = pd.read_csv(csv_path)
-    df = df[(df['Frame'] >= row['frame_start']) & (df['Frame'] <= row['frame_end'])]
-    mean_value = df['integer_motion2'].mean()
+    df = df[(df["Frame"] >= row["frame_start"]) & (df["Frame"] <= row["frame_end"])]
+    mean_value = df["integer_motion2"].mean()
     return mean_value
 
 
 def worker1(task_queue, args, process_id):
+    """Worker function for processing videos in parallel."""
     while True:
         try:
             video_path = task_queue.get(timeout=1)
@@ -75,8 +100,9 @@ def worker1(task_queue, args, process_id):
         process_single_row(video_path, args, process_id)
         task_queue.task_done()
 
-    
+
 def worker2(task_queue, results_queue, args):
+    """Worker function for calculating motion scores in parallel."""
     while True:
         try:
             index, row = task_queue.get(timeout=1)
@@ -88,11 +114,21 @@ def worker2(task_queue, results_queue, args):
 
 
 def parse_args():
+    """Parse command line arguments for motion analysis."""
     parser = argparse.ArgumentParser()
     parser.add_argument("meta_path", type=str)
-    parser.add_argument("--temp_save_dir", type=str, required=True, help="Directory to save the temporary files")
-    parser.add_argument("--num_workers", type=int, default=None, help="#workers for concurrent.futures")
-    parser.add_argument("--disable_parallel", action="store_true", help="disable parallel processing")
+    parser.add_argument(
+        "--temp_save_dir",
+        type=str,
+        required=True,
+        help="Directory to save the temporary files",
+    )
+    parser.add_argument(
+        "--num_workers", type=int, default=None, help="#workers for concurrent.futures"
+    )
+    parser.add_argument(
+        "--disable_parallel", action="store_true", help="disable parallel processing"
+    )
     parser.add_argument("--gpu_num", type=int, default=1, help="gpu number")
     args = parser.parse_args()
     return args
@@ -106,60 +142,80 @@ def main():
         return
 
     meta = pd.read_csv(args.meta_path)
-
-    video_paths = meta['video_path'].unique()
+    video_paths = meta["video_path"].unique()
 
     if args.disable_parallel:
+        # Sequential processing
         results = []
         for video_path in tqdm(video_paths, desc="Processing videos"):
             result = process_single_row(video_path, args, 0)
             results.append(result)
-        
-        for index, row in tqdm(meta.iterrows(), total=len(meta), desc="Calculating scores"):
+
+        for index, row in tqdm(
+            meta.iterrows(), total=len(meta), desc="Calculating scores"
+        ):
             result = calculate_score(row, args)
-            meta.at[index, 'motion'] = result
+            meta.at[index, "motion"] = result
     else:
+        # Parallel processing
         if args.num_workers is not None:
             num_workers = args.num_workers
         else:
             num_workers = os.cpu_count()
 
+        # First phase: process videos to generate CSV files
         manager = Manager()
         task_queue = manager.Queue()
 
         for video_path in video_paths:
             task_queue.put(video_path)
 
-        with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=num_workers
+        ) as executor:
             futures = []
             for id in range(num_workers):
                 futures.append(executor.submit(worker1, task_queue, args, id))
 
-            for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Finished workers"):
+            for future in tqdm(
+                concurrent.futures.as_completed(futures),
+                total=len(futures),
+                desc="Finished workers",
+            ):
                 future.result()
 
+        # Second phase: calculate motion scores
         result_queue = manager.Queue()
         task_queue = manager.Queue()
 
         for index, row in meta.iterrows():
             task_queue.put((index, row))
-        
-        with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=num_workers
+        ) as executor:
             futures = []
             for _ in range(num_workers):
                 futures.append(executor.submit(worker2, task_queue, result_queue, args))
 
-            for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Finished workers"):
+            for future in tqdm(
+                concurrent.futures.as_completed(futures),
+                total=len(futures),
+                desc="Finished workers",
+            ):
                 future.result()
 
+        # Collect and sort results
         results = []
         while not result_queue.empty():
             results.append(result_queue.get())
         results.sort(key=lambda x: x[0])
         results = list(map(lambda x: x[1], results))
-        meta['motion'] = results
+        meta["motion"] = results
 
-    csv_save_path = os.path.join(os.path.dirname(args.meta_path), 'clips_info_motion.csv')
+    csv_save_path = os.path.join(
+        os.path.dirname(args.meta_path), "clips_info_motion.csv"
+    )
     meta.to_csv(csv_save_path, index=False)
     print(f"New meta with motion scores saved to '{csv_save_path}'.")
 

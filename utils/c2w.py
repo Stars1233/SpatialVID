@@ -1,3 +1,8 @@
+"""
+Camera pose conversion utility from world-to-camera (w2c) to camera-to-world (c2w).
+Converts quaternion representations to rotation matrices and handles pose transformations.
+"""
+
 import einops
 import torch
 import torch.nn.functional as F
@@ -10,11 +15,11 @@ import multiprocessing as mp
 from multiprocessing import Manager
 import queue
 from tqdm import tqdm
-
 import shutil
 import glob
 
-class Pose():
+
+class Pose:
     """
     A class of operations on camera poses (numpy arrays with shape [...,3,4]).
     Each [3,4] camera pose takes the form of [R|t].
@@ -52,7 +57,7 @@ class Pose():
         assert pose.shape[-2:] == (3, 4)
         return pose
 
-    def invert(self, pose, use_inverse=False): # c2w <==> w2c
+    def invert(self, pose, use_inverse=False):  # c2w <==> w2c
         """
         Invert a camera pose.
 
@@ -121,12 +126,20 @@ class Pose():
         pose_new = np.concatenate([R, t * scale], axis=-1)
         return pose_new
 
+
 def quaternion_to_matrix(quaternions, eps: float = 1e-8):
-    '''
-    Convert the 4-dimensional quaternions to 3x3 rotation matrices.
+    """
+    Convert 4-dimensional quaternions to 3x3 rotation matrices.
     This is adapted from Pytorch3D:
     https://github.com/facebookresearch/pytorch3d/blob/main/pytorch3d/transforms/rotation_conversions.py
-    '''
+
+    Args:
+        quaternions: Quaternion tensor [..., 4] (order: i, j, k, r)
+        eps: Small value for numerical stability
+
+    Returns:
+        Rotation matrices [..., 3, 3]
+    """
 
     # Order changed to match scipy format!
     i, j, k, r = torch.unbind(quaternions, dim=-1)
@@ -148,22 +161,42 @@ def quaternion_to_matrix(quaternions, eps: float = 1e-8):
     )
     return einops.rearrange(o, "... (i j) -> ... i j", i=3, j=3)
 
-def pose_from_quaternion(pose):  # input is w2c, pose(n,7) or (n,v,7), after_pose (N,3,4) after_pose: w2c
-    # tensor in https://github.com/pointrix-project/Geomotion/blob/6ab0c364f1b44ab4ea190085dbf068f62b42727c/geomotion/model/cameras.py#L6
+
+def pose_from_quaternion(pose):
+    """
+    Convert pose from quaternion representation to transformation matrix.
+
+    Args:
+        pose: Pose tensor [..., 7] where first 3 elements are translation (t)
+              and last 4 elements are quaternion rotation (r)
+
+    Returns:
+        w2c_matrix: World-to-camera transformation matrices [..., 3, 4]
+    """
+    # Input is w2c, pose(n,7) or (n,v,7), output is (N,3,4) w2c matrix
+    # Tensor format from https://github.com/pointrix-project/Geomotion/blob/6ab0c364f1b44ab4ea190085dbf068f62b42727c/geomotion/model/cameras.py#L6
     if type(pose) == np.ndarray:
         pose = torch.tensor(pose)
     if len(pose.shape) == 1:
         pose = pose[None]
-    quat_t = pose[..., :3]
-    quat_r = pose[..., 3:]
-    w2c_matrix = torch.zeros((*list(pose.shape)[:-1],3,4), device=pose.device)
+    quat_t = pose[..., :3]  # Translation
+    quat_r = pose[..., 3:]  # Quaternion rotation
+    w2c_matrix = torch.zeros((*list(pose.shape)[:-1], 3, 4), device=pose.device)
     w2c_matrix[..., :3, 3] = quat_t
     w2c_matrix[..., :3, :3] = quaternion_to_matrix(quat_r)
     return w2c_matrix
 
 
 def possess_single_row(row, index, args):
-    id = row['id']
+    """
+    Process a single row to convert camera poses from w2c to c2w format.
+
+    Args:
+        row: Data row containing video ID
+        index: Row index
+        args: Command line arguments
+    """
+    id = row["id"]
     dir_path = os.path.join(args.dir_path, id, "reconstructions")
     cam_pos_file = os.path.join(dir_path, "poses.npy")
     if not os.path.exists(cam_pos_file):
@@ -171,18 +204,19 @@ def possess_single_row(row, index, args):
     extrinsic_file = os.path.join(dir_path, "extrinsics.npy")
     if os.path.exists(extrinsic_file):
         return
-    
+
+    # Load quaternion poses
     pose = np.load(cam_pos_file)
-    # w2c: (N,v,7) --> w2c: (N,v,3,4)
-    poses = pose_from_quaternion(pose) # pose: (N,7), after_pose (N,3,4) after_pose: w2c
+    # Convert w2c quaternion format (N,v,7) to w2c matrix format (N,v,3,4)
+    poses = pose_from_quaternion(pose)
     poses = poses.cpu().numpy()
-    # w2c: (N,v,3,4) --> c2w: (N,v,3,4)
+    # Convert w2c matrices to c2w matrices (N,v,3,4)
     pose_inv = Pose().invert(poses)
     np.save(extrinsic_file, pose_inv)
-    
-        
+
 
 def worker(task_queue, args, pbar):
+    """Worker function for parallel pose conversion processing."""
     while True:
         try:
             index, row = task_queue.get(timeout=1)
@@ -194,13 +228,19 @@ def worker(task_queue, args, pbar):
 
 
 def parse_args():
+    """Parse command line arguments for camera pose conversion."""
     parser = argparse.ArgumentParser(description="Convert quaternion to camera pose")
     parser.add_argument("csv_path", type=str, help="Path to the csv file")
     parser.add_argument("--dir_path", type=str, default="./outputs")
-    parser.add_argument("--num_workers", type=int,
-                        default=8, help="Number of workers for parallel processing")
-    parser.add_argument("--disable_parallel", action="store_true",
-                        help="Disable parallel processing")
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=8,
+        help="Number of workers for parallel processing",
+    )
+    parser.add_argument(
+        "--disable_parallel", action="store_true", help="Disable parallel processing"
+    )
     return parser.parse_args()
 
 
@@ -208,18 +248,22 @@ if __name__ == "__main__":
     args = parse_args()
 
     df = pd.read_csv(args.csv_path)
-    
+
     if args.disable_parallel:
+        # Sequential processing
         for index, row in tqdm(df.iterrows(), total=len(df)):
             possess_single_row(row, index, args)
     else:
+        # Parallel processing with multiple workers
         manager = Manager()
         task_queue = manager.Queue()
         for index, row in df.iterrows():
             task_queue.put((index, row))
-            
+
         with tqdm(total=len(df), desc="Finished tasks") as pbar:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=args.num_workers) as executor:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=args.num_workers
+            ) as executor:
                 futures = []
                 for _ in range(args.num_workers):
                     futures.append(executor.submit(worker, task_queue, args, pbar))
