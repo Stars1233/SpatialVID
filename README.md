@@ -56,7 +56,7 @@ SpatialVid is a large-scale and high-quality video dataset designed for
 
    Ignore the warning about `nvidia-nccl-cu12` version, it is not a problem.
 
-   About FFMPEG ？
+   About FFMPEG, please refer to the [FFMPEG with NVIDIA GPU](https://docs.nvidia.com/video-technologies/video-codec-sdk/11.1/ffmpeg-with-nvidia-gpu/index.html#compiling-ffmpeg) for CUDA acceleration and [VMAF](https://github.com/Netflix/vmaf) for VMAF support.
 
    Replace the `FFMPEG_PATH` variable in the [`scoring/motion/inference.py`](scoring/motion/inference.py) and [`utils/cut.py`](utils/cut.py) with the actual path to your ffmpeg executable, default is `/usr/local/bin/ffmpeg`.
 
