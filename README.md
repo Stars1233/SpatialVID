@@ -11,7 +11,7 @@
     <a href='#' target='_blank'>Lin-Zhuo Chen</a>,
     <a href='#' target='_blank'>Yanxi Zhou</a>,
     <a href='#' target='_blank'>Xun Cao</a>,
-    <a href='#' target='_blank'>Yao Yao</a>
+    <a href='#' target='_blank'>Yao Yao</a><sup>†</sup>
 </div>
 <div align='center'>
     Nanjing University
