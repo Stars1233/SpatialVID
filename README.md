@@ -32,6 +32,7 @@
 SpatialVid is a large-scale and high-quality video dataset designed for
 
 ## 🎉NEWS
+
 + [2025.09.01] 🔥 Our paper, code and SpatialVid-HQ dataset are released!
 
 ## Preparation
@@ -97,6 +98,7 @@ Or you can manually download the model weights from the following links and plac
 | Model               | File Name               | URL                                                                                                             |
 | ------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
 | Aesthetic Predictor | aesthetic               | [🔗](https://github.com/christophschuhmann/improved-aesthetic-predictor/raw/main/sac+logos+ava1-l14-linearMSE.pth) |
+| MegaSAM             | megasam_final           | [🔗](https://github.com/mega-sam/mega-sam/blob/main/checkpoints/megasam_final.pth)                                 |
 | RAFT                | raft-things             | [🔗](https://drive.google.com/uc?id=1MqDajR89k-xLV0HIrmJ0k-n8ZpG6_suM)                                             |
 | Depth Anything      | Depth-Anything-V2-Large | [🔗](https://huggingface.co/depth-anything/Depth-Anything-V2-Large)                                                |
 | UniDepth            | unidepth-v2-vitl14      | [🔗](https://huggingface.co/lpiccinelli/unidepth-v2-vitl14)                                                        |
