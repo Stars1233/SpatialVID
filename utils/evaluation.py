@@ -204,7 +204,7 @@ def worker(task_queue, result_queue, args, worker_id):
     """Worker function for parallel processing"""
     # Assign GPU based on worker ID
     device = torch.device(
-        f"cuda:{args.gpu_id[worker_id % args.gpu_num]}"
+        f"cuda:{worker_id % args.gpu_num}"
         if torch.cuda.is_available() else "cpu"
     )
 
@@ -226,7 +226,7 @@ def parse_args():
     parser.add_argument("--dir_path", type=str, default="./outputs", help="Base directory with reconstruction data")
     parser.add_argument("--output_path", type=str, default="./outputs/evaluation_results.csv", help="Output CSV path")
     parser.add_argument("--anomaly_threshold", type=int, default=2, help="Anomaly detection threshold")
-    parser.add_argument('--gpu_id', type=str, default='0', help='GPU IDs (e.g., "0,1")')
+    parser.add_argument('--gpu_num', type=int, default=1, help='Number of GPUs to use')
     parser.add_argument("--num_workers", type=int, default=4, help="Number of parallel workers")
     parser.add_argument("--disable_parallel", action="store_true", help="Disable parallel processing")
     return parser.parse_args()
@@ -237,10 +237,6 @@ if __name__ == "__main__":
     mp.set_start_method('spawn')
     args = parse_args()
 
-    # Parse GPU IDs
-    args.gpu_id = [int(gpu) for gpu in args.gpu_id.split(',')]
-    args.gpu_num = len(args.gpu_id)
-
     # Load input data
     df = pd.read_csv(args.csv_path)
 
@@ -248,7 +244,7 @@ if __name__ == "__main__":
     if args.disable_parallel:
         # Sequential processing
         for index, row in tqdm(df.iterrows(), total=len(df), desc="Processing videos"):
-            device = torch.device(f"cuda:{args.gpu_id[0]}" if torch.cuda.is_available() else "cpu")
+            device = torch.device(f"cuda:0" if torch.cuda.is_available() else "cpu")
             result = process_single_row(row, index, args, device)
             results.append((index, result))
     else:

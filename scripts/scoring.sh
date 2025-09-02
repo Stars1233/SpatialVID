@@ -81,9 +81,9 @@ CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 3.4 python scoring/motio
   
 # 3.4 get text by OCR using PaddleOCR, this should output ${ROOT_META}/clips_info_ocr.csv
 CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 3.5 python scoring/ocr/inference.py ${ROOT_META}/clips_info.csv \
+  --fig_load_dir ${ROOT_FIG} \
   --num_workers $((GPU_NUM * 4)) \
-  --gpu_num ${GPU_NUM} \
-  --fig_load_dir ${ROOT_FIG}
+  --gpu_num ${GPU_NUM}
 
 # 4 merge all the scores. This should output ${ROOT_META}/clips_with_score.csv
 CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES measure_time 4 python utils/merge_tables.py ${ROOT_META} --output ${ROOT_META}/clips_scores.csv

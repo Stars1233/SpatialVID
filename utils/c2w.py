@@ -1,5 +1,5 @@
 """
-Camera pose conversion utility from world-to-camera (w2c) to camera-to-world (c2w).
+Camera pose conversion utility to camera-to-world (c2w).
 Converts quaternion representations to rotation matrices and handles pose transformations.
 """
 

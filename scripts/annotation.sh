@@ -63,16 +63,21 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 4.2 python camera_pose
   --gpu_id ${CUDA_VISIBLE_DEVICES} \
   --num_workers $((GPU_NUM * 2))
 
-# 5. Convert the output poses.npy into a c2w matrix
-CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 5 python utils/c2w.py ${CSV} --OUTPUT_DIR ${OUTPUT_DIR} \
-  --num_workers $((GPU_NUM * 2))
-
-# 6. Dynamic Mask Prediction
-CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 6 python camera_pose_annotation/dynamic_mask/inference_batch.py ${CSV} --OUTPUT_DIR ${OUTPUT_DIR} \
+# 5. Dynamic Mask Prediction
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 5 python camera_pose_annotation/dynamic_mask/inference_batch.py ${CSV} \
+  --OUTPUT_DIR ${OUTPUT_DIR} \
   --checkpoints_path checkpoints --gpu_num ${GPU_NUM} \
   --num_workers $((GPU_NUM * 2))
 
-# 7. Evaluation of the results
-measure_time 7 python utils/evaluation.py ${CSV} --OUTPUT_DIR ${OUTPUT_DIR} \
-  --gpu_id ${CUDA_VISIBLE_DEVICES} --num_workers $((GPU_NUM * 2)) \
+# 6. Evaluation of the results
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 6 python utils/evaluation.py ${CSV} --OUTPUT_DIR ${OUTPUT_DIR} \
+  --gpu_num ${GPU_NUM} --num_workers $((GPU_NUM * 2)) \
   --output_path ${OUTPUT_DIR}/final_results.csv
+
+# 7. Convert the output poses.npy into a c2w matrix
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 7 python utils/c2w.py ${CSV} --OUTPUT_DIR ${OUTPUT_DIR} \
+  --num_workers $((GPU_NUM * 2))
+
+# 8. Normalize the intrinsics
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 8 python utils/normalize_intrinsics.py ${CSV} --OUTPUT_DIR ${OUTPUT_DIR} \
+  --num_workers $((GPU_NUM * 2))

@@ -1,3 +1,13 @@
+"""
+Batch inference for camera tracking using multiple GPUs.
+
+This module provides functionality for:
+- Parallel camera tracking processing across multiple videos
+- Multi-GPU support with automatic device assignment
+- Subprocess management for camera tracking pipeline
+- Progress tracking and error handling
+"""
+
 import pandas as pd
 import os
 import argparse
@@ -9,6 +19,9 @@ from tqdm import tqdm
 
 
 def process_single_row(row, index, args, worker_id=0):
+    """
+    Process a single video for camera tracking.
+    """
     dir_path = os.path.join(args.dir_path, row["id"])
     device_id = worker_id % args.gpu_num
 
@@ -27,6 +40,9 @@ def process_single_row(row, index, args, worker_id=0):
 
 
 def worker(task_queue, args, worker_id, pbar):
+    """
+    Worker function for parallel camera tracking processing.
+    """
     while True:
         try:
             index, row = task_queue.get(timeout=1)
@@ -38,6 +54,7 @@ def worker(task_queue, args, worker_id, pbar):
 
 
 def parse_args():
+    """Parse command line arguments for camera tracking batch inference."""
     parser = argparse.ArgumentParser()
     parser.add_argument("csv_path", type=str, help="Path to the csv file")
     parser.add_argument("--dir_path", type=str, default="./outputs")
@@ -60,19 +77,25 @@ def parse_args():
 def main():
     args = parse_args()
 
+    # Parse GPU configuration
     args.gpu_num = len(args.gpu_id.split(","))
     args.gpu_id = [int(gpu) for gpu in args.gpu_id.split(",")]
 
     df = pd.read_csv(args.csv_path)
 
     if args.disable_parallel:
+        # Sequential processing
         for index, row in tqdm(df.iterrows(), total=len(df), desc="Processing rows"):
             process_single_row(row, index, args)
     else:
+        # Parallel processing with multiple workers
         manager = Manager()
         task_queue = manager.Queue()
+
+        # Add all tasks to queue
         for index, row in df.iterrows():
             task_queue.put((index, row))
+
         with tqdm(total=len(df), desc="Processing rows") as pbar:
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=args.num_workers

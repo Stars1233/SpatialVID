@@ -124,6 +124,7 @@ def predict_mask(predictor, row, args, device):
         predictor.set_image(images[i])
 
         # Adaptive thresholding based on motion probability distribution
+        # We use an adaptive thresholding based on motion probability distribution to create initial masks. Then
         prob_min, prob_max = motion_prob.min(), motion_prob.max()
         threshold = (prob_max - prob_min) * 0.4 + prob_min
         if threshold > prob_max - 0.1:

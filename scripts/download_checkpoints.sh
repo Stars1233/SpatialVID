@@ -1,7 +1,10 @@
 mkdir -p ./checkpoints/
 cd ./checkpoints/
 
-# raft 
+# aesthetic
+wget https://github.com/christophschuhmann/improved-aesthetic-predictor/raw/main/sac+logos+ava1-l14-linearMSE.pth -O checkpoints/aesthetic.pth
+
+# raft
 mkdir -p ./raft/
 gdown -c https://drive.google.com/uc?id=1MqDajR89k-xLV0HIrmJ0k-n8ZpG6_suM -O raft/raft-things.pth
 
