@@ -1,3 +1,33 @@
-The input images are video frames extracted in chronological order. Please analyze these video frames and generate the following two distinct captions, no need for prompts like (Here are the captions for the video frames, based on your instructions), Output directly with (1.Camera Motion Caption:...) as the beginning:
-1. Camera Motion Caption :(1)From the perspective of the camera shooter, describe in detail the movement of the camera throughout the entire edit (e.g., static, pan, dolly, zoom, tilt, handheld, aerial, etc., and try to use these precise terms when describing the movement). Provide specific details about direction, speed, and any significant transitions or technical uses. The description should be based on the changes between frame and frame, and should not be described as "the camera's initial state is stationary" or "The camera begins static" directly based on the first frame.\n (2)Focus on describing the changes in the camera's motion state rather than simply describing frame-by-frame changes, for example, when the camera is moving forward continuously, do not describe it as: moving forward first and then forward. Instead, describe the change in motion state. If the image deviates at an intersection, the motion state changes at this point, and we can describe the motion as: the camera continues to move forward in a straight line, and turns right at the intersection. \n (3)When describing, it should also include a small amount of necessary environmental auxiliary description, such as "The camera moves forward, passing by the street lamp" or "The camera continues to move forward, turning left at the intersection" and "The camera remains stationary in position, but constantly rotates in direction, capturing the panoramic view of the park" and so on.\n (4)The generated description remains between 50-100 words.\n
-2. Scene Description :\n Provide a detailed description of the clip's content, including the main subjects and dynamic objects, their actions,(For example: A pedestrian moves to the right and crosses through the park's gate.)\n   the background/environment, lighting conditions, and overall atmosphere.(As for example, in the early morning, in a city park, a crowd is bustling around, and many flowers are blooming on the grass of the park.), Must take into account both the scenery description and the main object description. The description focuses on the overall image rather than frame-by-frame description. (100 words)
+You are given a sequence of video frames in chronological order. Analyze them carefully and generate two distinct captions based on the following instructions:
+
+1. Camera Motion Caption:
+
+From the perspective of the camera operator, describe the entire motion trajectory of the camera throughout the clip using precise cinematography terminology (e.g., static, pan, tilt, dolly, handheld, crane, aerial, zoom, etc.).  
+
+Do NOT assume the camera starts in a "static" position just because it appears stationary in the first frame.Only describe the camera as stationary if there is no visual change across multiple consecutive frames.
+
+Instead, focus on changes between frames to infer movement. Describe motion state transitions, not frame-by-frame repetition (e.g., do not say “the camera moves forward again” if it’s continuous). For example:
+- Starting with a dolly forward along a straight path,
+- Then transitioning into a slow right-hand pan,
+- Or shifting from handheld walking movement to a stationary pivot tilt.
+
+Include brief environmental context where relevant to clarify direction or intent (e.g., "The camera dollies forward through a narrow alleyway, then smoothly turns left at the intersection").
+
+Keep the final caption concise, between 50–100 words, focused only on motion and its evolution over time.
+
+2. Scene Description:
+
+Provide a rich, holistic description of the visual content. Include:
+- Main subjects and dynamic objects: who or what is present, and what they are doing (e.g., a cyclist rides past from left to right, a group of people gather near a bench),
+- Background/environment: setting (urban street, forest trail, indoor space), notable landmarks or structures,
+- Lighting and atmosphere: time of day, weather conditions, mood (e.g., golden-hour lighting, overcast sky casting soft shadows, neon-lit nighttime scene),
+- Overall tone or emotion conveyed by the scene.
+
+Avoid focusing on individual frames—describe the general impression and ongoing activity across the entire clip. Aim for around 100 words, balancing detail and conciseness.
+
+Output Format:  
+Do not include any explanations or extra text before or after your response.  
+Begin directly with:  
+1. Camera Motion Caption: ...
+followed by  
+2. Scene Description: ...

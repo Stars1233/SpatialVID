@@ -1,8 +1,0 @@
-// ... existing code ...
-__pycache__/
-utils/__pycache__/
-*.pyc
-// ... existing code ...
-data/
-test/
-post/

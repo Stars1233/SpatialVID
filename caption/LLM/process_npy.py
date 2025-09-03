@@ -1,72 +1,92 @@
 import os
-import pandas as pd
-import numpy as np
 import sys
+import pandas as pd
+import numpy as np  # 注：当前代码未直接使用numpy，但保留导入以维持与npy处理的兼容性
+
 from utils import npy_to_jsonl
+
 
 def process_csv_for_npy(data_dir, csv_filename):
     """
-    遍历指定CSV文件中的名称，寻找相应子目录并调用npy_to_jsonl处理数据
+    Iterate through subdirectory names in the specified CSV file, 
+    find corresponding subdirectories, and call npy_to_jsonl to process data.
     
     Args:
-        data_dir: 数据根目录
-        csv_filename: CSV文件名（包含要处理的子目录名列表）
+        data_dir (str): Root directory of the data
+        csv_filename (str): Name of CSV file containing list of subdirectory names to process
     """
-    # 读取CSV文件
+    # Validate and construct CSV file path
     csv_path = os.path.join(data_dir, csv_filename)
     if not os.path.exists(csv_path):
-        print(f"错误：CSV文件不存在 - {csv_path}")
+        print(f"Error: CSV file not found - {csv_path}")
         return
     
     try:
-        # 读取CSV文件，假设第一列包含子目录名
+        # Read CSV file and extract subdirectory names from the second column
         df = pd.read_csv(csv_path)
-        # 获取第一列的列名
-        first_column = df.columns[1]
-        # 获取子目录名列表
-        subdirs = df[first_column].tolist()
+        if len(df.columns) < 2:
+            print("Error: CSV file must contain at least two columns")
+            return
+            
+        # Get subdirectory names from the second column (index 1)
+        subdir_column = df.columns[1]
+        subdirs = df[subdir_column].tolist()
         
-        # 处理每个子目录
+        # Process each subdirectory
         for subdir in subdirs:
-            # 构建子目录完整路径
+            # Skip empty or invalid entries
+            if not subdir or not isinstance(subdir, str):
+                print(f"Warning: Invalid subdirectory name - {subdir}")
+                continue
+                
+            # Construct full path to subdirectory
             subdir_path = os.path.join(data_dir, subdir)
             
-            if not os.path.exists(subdir_path):
-                print(f"警告：子目录不存在 - {subdir_path}")
+            # Check if subdirectory exists
+            if not os.path.isdir(subdir_path):
+                print(f"Warning: Subdirectory does not exist - {subdir_path}")
                 continue
             
-            # 查找子目录下的reconstructions/poses.npy文件
-            npy_path = os.path.join(subdir_path, 'reconstructions', 'poses.npy')
+            # Locate the poses.npy file in reconstructions subdirectory
+            npy_file_path = os.path.join(subdir_path, 'reconstructions', 'poses.npy')
             
-            if not os.path.exists(npy_path):
-                print(f"警告：在子目录 {subdir_path} 中未找到 reconstructions/poses.npy 文件")
+            # Verify npy file exists
+            if not os.path.isfile(npy_file_path):
+                print(f"Warning: Could not find reconstructions/poses.npy in {subdir_path}")
                 continue
             
-            # 默认输出到子目录下的other_data目录
-            target_output_dir = os.path.join(subdir_path, 'other_data')
+            # Set up target output directory
+            output_dir = os.path.join(subdir_path, 'other_data')
+            os.makedirs(output_dir, exist_ok=True)  # Create if not exists
             
-            # 确保输出目录存在
-            if not os.path.exists(target_output_dir):
-                os.makedirs(target_output_dir)
-            
-            # 调用npy_to_jsonl函数处理数据
-            print(f"处理文件: {npy_path}")
-            print(f"输出目录: {target_output_dir}")
-            npy_to_jsonl(npy_path, target_output_dir)
+            # Process the npy file
+            print(f"Processing file: {npy_file_path}")
+            print(f"Output directory: {output_dir}")
+            npy_to_jsonl(npy_file_path, output_dir)
         
-        print("处理完成！")
+        print("Processing completed!")
     
+    except pd.errors.EmptyDataError:
+        print("Error: CSV file is empty")
+    except pd.errors.ParserError:
+        print("Error: Failed to parse CSV file")
     except Exception as e:
-        print(f"处理CSV文件时出错: {str(e)}")
+        print(f"Error processing CSV file: {str(e)}")
+
 
 if __name__ == "__main__":
-    # 处理命令行参数
-    if len(sys.argv) < 3:
-        print("用法: python process_npy.py <数据目录> <CSV文件名>")
+    # Validate command line arguments
+    if len(sys.argv) != 3:
+        print("Usage: python process_npy.py <data_directory> <csv_filename>")
         sys.exit(1)
     
-    data_dir = sys.argv[1]
+    data_directory = sys.argv[1]
     csv_filename = sys.argv[2]
     
-    # 调用处理函数
-    process_csv_for_npy(data_dir, csv_filename)
+    # Validate data directory exists
+    if not os.path.isdir(data_directory):
+        print(f"Error: Data directory does not exist - {data_directory}")
+        sys.exit(1)
+    
+    # Execute main processing function
+    process_csv_for_npy(data_directory, csv_filename)

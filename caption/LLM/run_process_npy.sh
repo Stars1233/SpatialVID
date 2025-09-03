@@ -1,44 +1,61 @@
 #!/bin/bash
 
-# 脚本名称: run_process_npy.sh
-# 描述: 调用process_npy.py处理CSV和NPY文件
-# 用法: 直接运行此脚本，参数已在脚本中显式指定
+##############################################################
+# Script Name: run_process_npy.sh
+# Description: Invokes process_npy.py to handle CSV and NPY files
+# Usage: Directly run this script (parameters are explicitly defined within)
+##############################################################
 
-# 显式指定参数
+# --------------------------
+# Parameter Definitions
+# --------------------------
+# Define data directory path
 DATA_DIR="/home/zrj/project/api_test/pipeline/data"
+# Define CSV filename to be processed
 CSV_FILENAME="stage1_total_done_sample_200.csv"
 
-# 检查数据目录是否存在
+
+# --------------------------
+# Pre-execution Checks
+# --------------------------
+# Verify data directory exists
 if [ ! -d "$DATA_DIR" ]; then
-    echo "错误: 数据目录 '$DATA_DIR' 不存在"
+    echo "Error: Data directory '$DATA_DIR' does not exist"
     exit 1
 fi
 
-# 检查CSV文件是否存在
+# Construct full CSV file path and verify existence
 CSV_PATH="$DATA_DIR/$CSV_FILENAME"
 if [ ! -f "$CSV_PATH" ]; then
-    echo "错误: CSV文件 '$CSV_PATH' 不存在"
+    echo "Error: CSV file '$CSV_PATH' does not exist"
     exit 1
 fi
 
-# 设置Python脚本路径
+# Define path to Python processing script
 SCRIPT_PATH="./process_npy.py"
 
-# 检查Python脚本是否存在
+# Verify Python script exists
 if [ ! -f "$SCRIPT_PATH" ]; then
-    echo "错误: Python脚本 '$SCRIPT_PATH' 不存在"
+    echo "Error: Python script '$SCRIPT_PATH' does not exist"
     exit 1
 fi
 
-# 根据是否提供输出目录来调用Python脚本
 
-echo "执行: python $SCRIPT_PATH 处理 $DATA_DIR 中的 $CSV_FILENAME"
+# --------------------------
+# Script Execution
+# --------------------------
+# Execute Python script with defined parameters
+echo "Executing: python $SCRIPT_PATH to process $CSV_FILENAME in $DATA_DIR"
 python "$SCRIPT_PATH" "$DATA_DIR" "$CSV_FILENAME"
 
-# 检查Python脚本执行状态
+
+# --------------------------
+# Execution Result Check
+# --------------------------
+# Check if Python script executed successfully
 if [ $? -eq 0 ]; then
-    echo "处理完成！"
+    echo "Processing completed successfully!"
 else
-    echo "处理过程中出现错误，请检查日志。"
+    echo "An error occurred during processing. Please check logs."
     exit 1
 fi

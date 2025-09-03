@@ -3,22 +3,31 @@ import chardet
 import multiprocessing
 from tqdm import tqdm
 import queue
+import time
+
 
 def is_text_file(file_path):
-    """检查文件是否为文本文件或包含非文本内容"""
+    """
+    Check if a file is a text file or contains non-text content
+    Args:
+        file_path: Path to the file to check
+    Returns:
+        bool: True if the file is a valid text file, False otherwise
+    """
     try:
+        # Read first 1024 bytes for encoding detection
         with open(file_path, 'rb') as f:
-            raw_data = f.read(1024)  # 读取前1024字节用于检测
+            raw_data = f.read()
             
-        # 检测文件编码
+        # Detect file encoding
         result = chardet.detect(raw_data)
         encoding = result['encoding']
         
-        # 如果无法检测编码，可能不是文本文件
+        # If encoding can't be detected, it's likely not a text file
         if encoding is None:
             return False
             
-        # 尝试使用检测到的编码解码
+        # Try decoding with detected encoding to verify
         try:
             raw_data.decode(encoding)
             return True
@@ -27,135 +36,153 @@ def is_text_file(file_path):
     except Exception:
         return False
 
-def contains_qwen_model(file_path, encoding):
-    """检查文件是否包含'Qwen model'字符串"""
-    try:
-        with open(file_path, 'r', encoding=encoding) as f:
-            content = f.read()
-            return 'Qwen model' in content
-    except:
-        return False
 
-def worker(task_queue, result_queue, pbar, lock):
-    """工作进程函数，从任务队列获取文件并处理"""
+# def contains_qwen_model(file_path, encoding):
+#     """Check if file contains the string 'Qwen model'"""
+#     try:
+#         with open(file_path, 'r', encoding=encoding) as f:
+#             content = f.read()
+#             return 'Qwen model' in content
+#     except:
+#         return False
+
+
+def worker(task_queue, result_queue, progress_counter, lock):
+    """
+    Worker process function that retrieves files from task queue and processes them
+    Args:
+        task_queue: Queue containing (directory, filename) tuples to process
+        result_queue: Queue to store processing results (whether file was deleted)
+        progress_counter: Shared counter to track processing progress
+        lock: Multiprocessing lock for synchronized access to shared resources
+    """
     while True:
         try:
-            # 非阻塞方式获取任务
+            # Get task in non-blocking mode
             directory, filename = task_queue.get(block=False)
         except queue.Empty:
-            # 队列为空时退出循环
+            # Exit loop when queue is empty
             break
             
         file_path = os.path.join(directory, filename)
         deleted = False
         
-        # 检查文件是否为空
+        # Check if file is empty
         if os.path.getsize(file_path) == 0:
             with lock:
-                print(f"删除空文件: {filename}")
+                print(f"Deleting empty file: {filename}")
             os.remove(file_path)
             deleted = True
             
-        # 检查文件是否为文本文件
+        # Check if file is a valid text file
         elif not is_text_file(file_path):
             with lock:
-                print(f"删除破损文件: {filename}")
+                print(f"Deleting corrupted file: {filename}")
             os.remove(file_path)
             deleted = True
             
-        # 获取文件编码并检查内容
-        else:
-            with open(file_path, 'rb') as f:
-                raw_data = f.read(1024)
-                result = chardet.detect(raw_data)
-                encoding = result['encoding'] or 'utf-8'  # 默认使用utf-8
+        # Get file encoding and check content (commented out functionality)
+        # else:
+        #     with open(file_path, 'rb') as f:
+        #         raw_data = f.read(1024)
+        #         result = chardet.detect(raw_data)
+        #         encoding = result['encoding'] or 'utf-8'  # Use utf-8 as fallback
                 
-            # 检查文件是否包含"Qwen model"
-            if not contains_qwen_model(file_path, encoding):
-                with lock:
-                    print(f"删除不包含'Qwen model'的文件: {filename}")
-                os.remove(file_path)
-                deleted = True
+        #     # Check if file contains "Qwen model"
+        #     if not contains_qwen_model(file_path, encoding):
+        #         with lock:
+        #             print(f"Deleting file without 'Qwen model': {filename}")
+        #         os.remove(file_path)
+        #         deleted = True
         
-        # 将结果放入结果队列
+        # Put result in queue
         result_queue.put(deleted)
         
-        # 更新共享计数器而不是直接更新进度条
+        # Update shared progress counter
         with lock:
-            pbar[0] += 1
+            progress_counter[0] += 1
         
-        # 标记任务完成
+        # Mark task as completed
         task_queue.task_done()
 
+
 def clean_text_files(directory):
-    """清理目录中的破损或空txt文件"""
+    """
+    Clean up corrupted or empty text files in a directory using multiprocessing
+    Args:
+        directory: Path to the directory containing text files to clean
+    """
     if not os.path.exists(directory):
-        print(f"错误: 目录 '{directory}' 不存在")
+        print(f"Error: Directory '{directory}' does not exist")
         return
         
-    # 获取所有txt文件
+    # Get all txt files in the directory
     txt_files = [f for f in os.listdir(directory) if f.endswith('.txt')]
     total_files = len(txt_files)
     
     if total_files == 0:
-        print("没有找到txt文件")
+        print("No text files found")
         return
     
-    # 创建任务队列
+    # Create task queue for file processing
     task_queue = multiprocessing.JoinableQueue()
     
-    # 创建结果队列
+    # Create result queue for tracking deletions
     result_queue = multiprocessing.Queue()
     
-    # 创建进程间锁，用于控制打印输出
+    # Create lock for synchronized printing and counter updates
     lock = multiprocessing.Lock()
     
-    # 填充任务队列
+    # Populate task queue with file paths
     for filename in txt_files:
         task_queue.put((directory, filename))
     
-    # 创建共享的进度计数器
+    # Create shared progress counter using manager
     manager = multiprocessing.Manager()
-    pbar = manager.list([0])  # 用列表模拟共享变量
+    progress_counter = manager.list([0])  # Use list to allow modification in processes
     
-    # 创建并启动工作进程
+    # Create and start worker processes
     processes = []
-    for _ in range(16):
+    for _ in range(16):  # Use 16 worker processes
         p = multiprocessing.Process(
             target=worker, 
-            args=(task_queue, result_queue, pbar, lock)
+            args=(task_queue, result_queue, progress_counter, lock)
         )
         p.start()
         processes.append(p)
     
-    # 创建进度条显示进程
-    with tqdm(total=total_files, desc="LLM clean", unit="it") as pbar_display:
-        # 监控共享计数器并更新进度条
+    # Display progress bar
+    with tqdm(total=total_files, desc="Cleaning files", unit="file") as pbar_display:
         last_count = 0
+        # Update progress bar while processes are running
         while any(p.is_alive() for p in processes):
-            current_count = pbar[0]
+            current_count = progress_counter[0]
             if current_count > last_count:
                 pbar_display.update(current_count - last_count)
                 last_count = current_count
-            # 短暂休眠以减少CPU使用
-            import time
-            time.sleep(0.1)
+            time.sleep(0.1)  # Short sleep to reduce CPU usage
     
-    # 等待所有进程结束
+    # Wait for all processes to complete
     for p in processes:
         p.join()
     
-    # 统计删除的文件数
+    # Count total deleted files
     deleted_count = 0
     while not result_queue.empty():
         if result_queue.get():
             deleted_count += 1
     
-    print(f"total delete {deleted_count} files")
+    print(f"Total deleted files: {deleted_count}")
+
 
 if __name__ == "__main__":
-    # 从argv获取group id
     import sys
+    # Get group ID from command line argument
+    if len(sys.argv) < 2:
+        print("Usage: python clean_text_files.py <group_id>")
+        sys.exit(1)
+        
     group_id = sys.argv[1]
     directory = f'/share/wjh/opencam/datasets/annotations/tmp_captions/{group_id}/llm_tmp'
     clean_text_files(directory)
+    
