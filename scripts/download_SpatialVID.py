@@ -1,4 +1,4 @@
-## TODO: need to change to ours.
+## TODO: need to change to ours. copied from Openvid
 import os
 import subprocess
 import argparse
