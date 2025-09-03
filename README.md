@@ -24,7 +24,7 @@
   <a href="https://huggingface.co/SpatialVid"><img src="https://img.shields.io/static/v1?label=Dataset&message=HuggingFace&color=yellow&logo=huggingface"></a>  
 </div>
 <p align="center">
-  <img src="assets/overview.jpg"  height=400>
+  <img src="assets/overview.png"  height=400>
 </p>
 
 ## Abstract
@@ -110,7 +110,7 @@ Or you can manually download the model weights from the following links and plac
 The whole pipeline is illustrated in the figure below:
 
 <p align="center">
-  <img src="assets/pipeline.jpg"  height=340>
+  <img src="assets/pipeline.png"  height=340>
 </p>
 
 1. Scoring
