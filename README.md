@@ -27,9 +27,10 @@
   <img src="assets/overview.jpg"  height=400>
 </p>
 
-## Introduction
+## Abstract
 
-SpatialVid is a large-scale and high-quality video dataset designed for
+Significant progress has been made in spatial intelligence, spanning both spatial reconstruction and world exploration. However, the scalability and real-world fidelity of current models remain severely constrained by the scarcity of large-scale, high-quality training data. While several datasets provide camera pose information, they are typically limited in scale, diversity, and annotation richness, particularly for dynamic scenes with realistic camera motion. To address this gap, we collect a large corpus of raw video with natural camera movement, providing the foundation for constructing a dataset with unique scale and diversity. In this work, we introduce **SpatialVID**, a large-scale dynamic spatial dataset explicitly designed to provide expressive annotations for this purpose. Through a hierarchical filtering pipeline, we process more than **21,000 hours** of collected raw video into **2.7 million clips**, totaling **7,089 hours** of dynamic content. A subsequent annotation pipeline enriches these clips with detailed spatial and semantic information, including camera poses, depth maps, dynamic masks, structured captions, and labels for camera motion and scene composition. 
+<!-- Thorough analysis of the data demonstrates that models trained on **SpatialVID** achieve significantly improved generalization and performance relative to existing datasets, establishing it as a key asset for researchers. -->
 
 ## 🎉NEWS
 
