@@ -11,7 +11,7 @@ wait_time=1
 vqa_prompt_file=caption/VQA/prompt.txt
 vqa_model=gemini-2.0-flash
 vqa_api_key=[Replace with your api key]
-vqa_base_domain=https://www.dmxapi.cn/
+vqa_base_domain=https://generativelanguage.googleapis.com/
 
 # LLM
 llm_prompt_dir=caption/LLM

@@ -24,7 +24,7 @@ def api_call(prompt_text, model, api_key, base_domain):
         }
     else:
         # Payload format for other models
-        api_url = base_domain + "v1/chat/completions"
+        api_url = base_domain + "v1beta/openai/"
         payload = {
             "model": model,
             "messages": [
@@ -45,7 +45,7 @@ def api_call(prompt_text, model, api_key, base_domain):
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
-            "User-Agent": f"DMXAPI/1.0.0 ({base_domain})",
+            "User-Agent": f"({base_domain})",
             "Accept": "application/json"
         }
 
