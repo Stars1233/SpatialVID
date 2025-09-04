@@ -56,7 +56,7 @@ def worker(task_queue, result_queue, args, id):
         device=device,
         use_doc_orientation_classify=False,  # Disable document orientation classification
         use_doc_unwarping=False,  # Disable text image correction
-        use_textline_orientation=False,  # Disable text line orientation classification
+        use_textline_orientation=False  # Disable text line orientation classification
     )
 
     while True:

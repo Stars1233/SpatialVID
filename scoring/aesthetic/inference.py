@@ -118,7 +118,7 @@ class AestheticScorer(nn.Module):
 def parse_args():
     """Parse command line arguments for aesthetic scoring."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv_path ", type=str, help="Path to the input CSV file")
+    parser.add_argument("--csv_path", type=str, help="Path to the input CSV file")
     parser.add_argument(
         "--load_num", type=int, default=4, help="Number of frames to load"
     )

@@ -14,12 +14,12 @@ from tqdm import tqdm
 
 
 def extract_frames(
-    video_path, output_folder, interval, frame_start, num_frames, target_size=None
+    video_path, output_dir, interval, frame_start, num_frames, target_size=None
 ):
     """Extract frames from video at specified intervals"""
     # Create output directory
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     # Open video file
     cap = cv2.VideoCapture(video_path)
@@ -37,7 +37,7 @@ def extract_frames(
 
         # Save frame at specified intervals
         if frame % interval == 0:
-            frame_filename = os.path.join(output_folder, f"frame_{frame:06d}.jpg")
+            frame_filename = os.path.join(output_dir, f"frame_{frame:06d}.jpg")
             if target_size is not None:
                 image = cv2.resize(image, target_size)
             cv2.imwrite(frame_filename, image)
@@ -50,12 +50,12 @@ def process_single_row(row, row_index, args):
     video_path = row["video_path"]
     frame_start = row.get("frame_start", 0)
     num_frames = row["num_frames"]
-    output_folder = os.path.join(args.output_folder, row["id"])
+    output_dir = os.path.join(args.output_dir, row["id"])
 
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    output_folder = os.path.join(output_folder, "img")
+    output_dir = os.path.join(output_dir, "img")
 
     # Calculate frame extraction interval
     if args.interval is None:
@@ -64,7 +64,7 @@ def process_single_row(row, row_index, args):
         interval = int(args.interval * row["fps"])
 
     extract_frames(
-        video_path, output_folder, interval, frame_start, num_frames, args.target_size
+        video_path, output_dir, interval, frame_start, num_frames, args.target_size
     )
 
 
@@ -86,14 +86,12 @@ def parse_args():
         "--csv_path", type=str, help="Path to CSV file with video csvdata"
     )
     parser.add_argument(
-        "-o",
-        "--output_folder",
+        "--output_dir",
         type=str,
         default="extract_frames",
-        help="Output folder for extracted frames",
+        help="Output directory for extracted frames",
     )
     parser.add_argument(
-        "-i",
         "--interval",
         type=float,
         default=None,
@@ -123,8 +121,8 @@ def main():
         args.target_size = tuple(map(int, args.target_size.split("*")))
 
     # Create output directory
-    if not os.path.exists(args.output_folder):
-        os.makedirs(args.output_folder)
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
 
     # Load video csvdata
     csv = pd.read_csv(args.csv_path)

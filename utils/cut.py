@@ -246,6 +246,10 @@ def main():
     # Save results to CSV
     columns = csv.columns
     new_df = pd.DataFrame(new_rows, columns=columns)
+    new_df = new_df.drop(columns=["timestamp_start"])
+    new_df = new_df.drop(columns=["timestamp_end"])
+    new_df = new_df.drop(columns=["frame_start"])
+    new_df = new_df.drop(columns=["frame_end"])
     new_df.to_csv(args.csv_save_path, index=False)
     print(f"Saved {len(new_df)} clip information to {args.csv_save_path}.")
 

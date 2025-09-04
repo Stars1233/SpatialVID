@@ -55,7 +55,7 @@ def worker(task_queue, args, pbar):
 def parse_args():
     """Parse command line arguments for intrinsics normalization."""
     parser = argparse.ArgumentParser(description="Normalize camera intrinsics to standard format")
-    parser.add_argument("csv_path", type=str, help="Path to the csv file")
+    parser.add_argument("--csv_path", type=str, help="Path to the csv file")
     parser.add_argument("--dir_path", type=str, default="./outputs")
     parser.add_argument(
         "--num_workers",

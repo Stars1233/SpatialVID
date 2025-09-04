@@ -28,7 +28,7 @@ measure_time() {
 # 1. Extract frames
 measure_time 1 python utils/extract_frames.py \
   --csv_path ${CSV} \
-  --output_folder ${OUTPUT_DIR} \
+  --output_dir ${OUTPUT_DIR} \
   --num_workers $((GPU_NUM * 2)) \
   --interval 0.2
 
@@ -37,14 +37,14 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 2.1 torchrun --standal
   --csv_path ${CSV} \
   --encoder vitl \
   --checkpoints_path checkpoints \
-  --OUTPUT_DIR ${OUTPUT_DIR} \
+  --output_dir ${OUTPUT_DIR} \
   --bs 16 \
   --num_workers ${GPU_NUM}
 
 # 2.2 Depth Estimation with UniDepth
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 2.2 torchrun --standalone --nproc_per_node ${GPU_NUM} camera_pose_annotation/depth_estimation/UniDepth/inference_batch.py \
   --csv_path ${CSV} \
-  --OUTPUT_DIR ${OUTPUT_DIR} \
+  --output_dir ${OUTPUT_DIR} \
   --checkpoints_path checkpoints \
   --bs 32 \
   --num_workers ${GPU_NUM}
@@ -52,7 +52,7 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 2.2 torchrun --standal
 # 3. Camera Tracking
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 3 python camera_pose_annotation/camera_tracking/inference_batch.py \
   --csv_path ${CSV} \
-  --OUTPUT_DIR ${OUTPUT_DIR} \
+  --dir_path ${OUTPUT_DIR} \
   --checkpoints_path checkpoints \
   --gpu_id ${CUDA_VISIBLE_DEVICES} \
   --num_workers $((GPU_NUM * 2))
@@ -60,7 +60,7 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 3 python camera_pose_a
 # 4.1 CVD Optimization Preprocess
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 4.1 python camera_pose_annotation/cvd_opt/preprocess/inference_batch.py \
   --csv_path ${CSV} \
-  --OUTPUT_DIR ${OUTPUT_DIR} \
+  --dir_path ${OUTPUT_DIR} \
   --checkpoints_path checkpoints \
   --gpu_id ${CUDA_VISIBLE_DEVICES} \
   --num_workers $((GPU_NUM * 2))
@@ -68,14 +68,14 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 4.1 python camera_pose
 # 4.2 CVD Optimization
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 4.2 python camera_pose_annotation/cvd_opt/inference_batch.py \
   --csv_path ${CSV} \
-  --OUTPUT_DIR ${OUTPUT_DIR} \
+  --dir_path ${OUTPUT_DIR} \
   --gpu_id ${CUDA_VISIBLE_DEVICES} \
   --num_workers $((GPU_NUM * 2))
 
 # 5. Dynamic Mask Prediction
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 5 python camera_pose_annotation/dynamic_mask/inference_batch.py \
   --csv_path ${CSV} \
-  --OUTPUT_DIR ${OUTPUT_DIR} \
+  --dir_path ${OUTPUT_DIR} \
   --checkpoints_path checkpoints \
   --gpu_num ${GPU_NUM} \
   --num_workers $((GPU_NUM * 2))
@@ -83,7 +83,7 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 5 python camera_pose_a
 # 6. Evaluation of the results
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 6 python utils/evaluation.py \
   --csv_path ${CSV} \
-  --OUTPUT_DIR ${OUTPUT_DIR} \
+  --dir_path ${OUTPUT_DIR} \
   --gpu_num ${GPU_NUM} \
   --num_workers $((GPU_NUM * 2)) \
   --output_path ${OUTPUT_DIR}/final_results.csv
@@ -91,11 +91,11 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 6 python utils/evaluat
 # 7. Convert the output poses.npy into a c2w matrix
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 7 python utils/c2w.py \
   --csv_path ${CSV} \
-  --OUTPUT_DIR ${OUTPUT_DIR} \
+  --dir_path ${OUTPUT_DIR} \
   --num_workers $((GPU_NUM * 2))
 
 # 8. Normalize the intrinsics
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 8 python utils/normalize_intrinsics.py \
   --csv_path ${CSV} \
-  --OUTPUT_DIR ${OUTPUT_DIR} \
+  --dir_path ${OUTPUT_DIR} \
   --num_workers $((GPU_NUM * 2))

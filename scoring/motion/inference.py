@@ -116,7 +116,7 @@ def worker2(task_queue, results_queue, args):
 def parse_args():
     """Parse command line arguments for motion analysis."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv_path ", type=str, required=True, help="Path to the CSV file")
+    parser.add_argument("--csv_path", type=str, required=True, help="Path to the CSV file")
     parser.add_argument(
         "--temp_save_dir",
         type=str,
@@ -130,6 +130,7 @@ def parse_args():
         "--disable_parallel", action="store_true", help="disable parallel processing"
     )
     parser.add_argument("--gpu_num", type=int, default=1, help="gpu number")
+    parser.add_argument("--skip_if_existing", action="store_true")
     args = parser.parse_args()
     return args
 

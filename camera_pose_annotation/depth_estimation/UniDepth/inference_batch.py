@@ -80,7 +80,7 @@ def parse_args():
     """Parse command line arguments for UniDepth inference."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv_path", type=str, help="Path to the csv file")
-    parser.add_argument("--dir_path", type=str, default="./vis_depth")
+    parser.add_argument("--output_dir", type=str, default="./output")
     parser.add_argument("--checkpoints_path", type=str, default="./checkpoints")
     parser.add_argument(
         "--input_size", type=int, default=640, help="Input size for the model"
@@ -108,7 +108,7 @@ def main():
     for index, row in tqdm(
         df.iterrows(), total=len(df), desc="Loading images", disable=local_rank != 0
     ):
-        img_dir = os.path.join(args.dir_path, row["id"], "img")
+        img_dir = os.path.join(args.output_dir, row["id"], "img")
         if not os.path.exists(img_dir):
             print(f"Image directory not found: {img_dir}")
             continue

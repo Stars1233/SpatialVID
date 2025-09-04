@@ -84,7 +84,7 @@ class VideoDataset(torch.utils.data.Dataset):
 def parse_args():
     """Parse command line arguments for luminance analysis."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv_path ", type=str, help="Path to the input CSV file")
+    parser.add_argument("--csv_path", type=str, help="Path to the input CSV file")
     parser.add_argument("--bs", type=int, default=4, help="Batch size")
     parser.add_argument("--num_workers", type=int, default=16, help="Number of workers")
     parser.add_argument(

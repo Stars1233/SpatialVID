@@ -76,7 +76,7 @@ def parse_args():
         description="Filter video dataset by quality metrics"
     )
     parser.add_argument(
-        "--csv_path", type=str, nargs="+", help="Path to input CSV file"
+        "--csv_path", type=str, required=True, help="Path to input CSV file"
     )
     parser.add_argument(
         "--csv_save_path", type=str, default=None, help="Path to save output CSV file"

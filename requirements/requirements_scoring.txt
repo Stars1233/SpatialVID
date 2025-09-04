@@ -7,10 +7,8 @@ decord==0.6.0
 imageio-ffmpeg==0.6.0
 ffmpeg-python==0.2.0
 clip @ git+https://github.com/openai/CLIP.git
-# remove later
-# clip@ git+https://githubfast.com/openai/CLIP.git
 cpbd==1.0.7
-# pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
-paddlepaddle-gpu==3.0.0 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/
-paddleocr==3.1.0
+# paddlepaddle-gpu==3.0.0 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/
+paddleocr==3.0.0
 nvidia-nccl-cu12==2.26.2
+numpy==1.26.4

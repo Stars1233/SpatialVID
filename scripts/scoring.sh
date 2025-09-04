@@ -1,6 +1,7 @@
 #!/bin/bash
 ROOT_VIDEO=[Replace with the path to your video files]
 OUTPUT_DIR=[Replace with the path to your output directory]
+mkdir -p ${OUTPUT_DIR}
 
 GPU_NUM=8
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
@@ -53,18 +54,23 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 2.1 python utils/scene
   --csv_path ${ROOT_META}/meta_info.csv \
   --num_workers 64 \
   --frame_skip 2\
-  --start_remove_sec 0.3 --end_remove_sec 0.3 \
-  --min_seconds 3 --max_seconds 15
+  --start_remove_sec 0.3 \
+  --end_remove_sec 0.3 \
+  --min_seconds 3 \
+  --max_seconds 15
 
 # 2.2 Get clips. This should output ${ROOT_META}/clips_info.csv
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 2.2 python utils/get_clip.py \
   --csv_path ${ROOT_META}/meta_info_timestamp.csv \
-  --csv_save_dir ${ROOT_META} --num_workers $((GPU_NUM * 4))
+  --csv_save_dir ${ROOT_META} \
+  --num_workers $((GPU_NUM * 4))
 
 # 2.3 Extract frames for scoring.
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 2.3 python utils/extract_frames.py \
   --csv_path ${ROOT_META}/clips_info.csv \
-  --output_folder ${ROOT_FIG} --num_workers 64 --target_size "640*360"
+  --output_dir ${ROOT_FIG} \
+  --num_workers 64 \
+  --target_size "640*360"
 
 # 3.1 Predict aesthetic scores. This should output ${ROOT_META}/clips_info_aes.csv
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 3.1 torchrun --nproc_per_node ${GPU_NUM} scoring/aesthetic/inference.py \
@@ -103,8 +109,12 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 4 python utils/merge_t
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 5 python utils/filter.py \
   --csv_path ${ROOT_META}/clips_scores.csv \
   --csv_save_path ${ROOT_META}/filtered_clips.csv \
-  --aes_min 4 --lum_min 20 --lum_max 140 \
-  --motion_min 2 --motion_max 14 --ocr_max 0.3
+  --aes_min 4 \
+  --lum_min 20 \
+  --lum_max 140 \
+  --motion_min 2 \
+  --motion_max 14 \
+  --ocr_max 0.3
 
 # 6 Cut the clips.
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 6 python utils/cut.py \
