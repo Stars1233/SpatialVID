@@ -101,9 +101,9 @@ def process_single_row(row, frame_skip=0, start_remove_sec=0, end_remove_sec=0, 
 def parse_args():
     """Parse command line arguments for scene detection."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("meta_path", type=str)
-    parser.add_argument("--num_workers", type=int, default=None, help="#workers for concurrent.futures")
-    parser.add_argument("--frame_skip", type=int, default=None, help="skip frame for detect_scenes")
+    parser.add_argument("--csv_path", type=str, required=True, help="Path to the input CSV file containing video paths.")
+    parser.add_argument("--num_workers", type=int, default=1, help="#workers for concurrent.futures")
+    parser.add_argument("--frame_skip", type=int, default=0, help="skip frame for detect_scenes")
     parser.add_argument("--start_remove_sec", type=float, default=0, help="Seconds to remove from the start of each timestamp")
     parser.add_argument("--end_remove_sec", type=float, default=0, help="Seconds to remove from the end of each timestamp")
     parser.add_argument("--min_seconds", type=float, default=2, help="Minimum duration of a scene in seconds")
@@ -141,12 +141,12 @@ def worker(task_queue, results_queue, args):
 
 def main():
     args = parse_args()
-    meta_path = args.meta_path
-    if not os.path.exists(meta_path):
-        print(f"Meta file '{meta_path}' not found. Exit.")
+    csv_path = args.csv_path
+    if not os.path.exists(csv_path):
+        print(f"csv file '{csv_path}' not found. Exit.")
         return
 
-    meta = pd.read_csv(meta_path)
+    csv = pd.read_csv(csv_path)
 
     from multiprocessing import Manager
     manager = Manager()
@@ -154,7 +154,7 @@ def main():
     results_queue = manager.Queue()
 
     # Add all tasks to queue
-    for index, row in meta.iterrows():
+    for index, row in csv.iterrows():
         task_queue.put((index, row))
 
     # Set number of workers
@@ -182,9 +182,9 @@ def main():
     ret.sort(key=lambda x: x[0])
     succ, timestamps, fps_list = list(zip(*[result for _, result in ret]))
 
-    meta["fps"] = fps_list
-    meta["timestamp"] = timestamps
-    meta = meta[np.array(succ)]
+    csv["fps"] = fps_list
+    csv["timestamp"] = timestamps
+    csv = csv[np.array(succ)]
 
     def calculate_frame_numbers(row):
         """Calculate frame numbers from timestamps and fps."""
@@ -193,13 +193,13 @@ def main():
         frame_numbers = [(timecode_to_frames(start, fps), timecode_to_frames(end, fps)) for start, end in timestamp]
         return str(frame_numbers)
 
-    meta["frame_numbers"] = meta.apply(calculate_frame_numbers, axis=1)
+    csv["frame_numbers"] = csv.apply(calculate_frame_numbers, axis=1)
 
     # Save results to new CSV file
-    wo_ext, ext = os.path.splitext(meta_path)
+    wo_ext, ext = os.path.splitext(csv_path)
     out_path = f"{wo_ext}_timestamp{ext}"
-    meta.to_csv(out_path, index=False)
-    print(f"New meta (shape={meta.shape}) with timestamp and frame numbers saved to '{out_path}'.")
+    csv.to_csv(out_path, index=False)
+    print(f"New csv (shape={csv.shape}) with timestamp and frame numbers saved to '{out_path}'.")
 
 
 if __name__ == "__main__":

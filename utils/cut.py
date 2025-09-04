@@ -119,15 +119,15 @@ def process_single_row(row, args, process_id):
 def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description="Cut video clips from source videos")
-    parser.add_argument("meta_path", type=str, help="Path to metadata CSV file")
+    parser.add_argument("--csv_path", type=str, help="Path to input CSV file")
+    parser.add_argument(
+        "--csv_save_path", type=str, required=True, help="Path to save CSV file"
+    )
     parser.add_argument(
         "--video_save_dir",
         type=str,
         required=True,
         help="Directory to save video clips",
-    )
-    parser.add_argument(
-        "--csv_save_dir", type=str, required=True, help="Directory to save CSV file"
     )
     parser.add_argument(
         "--target_fps", type=int, default=None, help="Target fps of output clips"
@@ -173,15 +173,12 @@ def worker(task_queue, results_queue, args, process_id):
 def main():
     """Main function to process video cutting"""
     args = parse_args()
-    meta_path = args.meta_path
-    if not os.path.exists(meta_path):
-        print(f"Meta file '{meta_path}' not found. Exit.")
+    csv_path = args.csv_path
+    if not os.path.exists(csv_path):
+        print(f"csv file '{csv_path}' not found. Exit.")
         return
 
-    os.makedirs(args.video_save_dir, exist_ok=True)
-    os.makedirs(args.csv_save_dir, exist_ok=True)
-
-    meta = pd.read_csv(args.meta_path)
+    csv = pd.read_csv(args.csv_path)
 
     # Setup multiprocessing
     from multiprocessing import Manager
@@ -190,7 +187,7 @@ def main():
     task_queue = manager.Queue()
     results_queue = manager.Queue()
 
-    for index, row in meta.iterrows():
+    for index, row in csv.iterrows():
         task_queue.put((index, row))
 
     process_single_row_partial = partial(process_single_row, args=args)
@@ -198,7 +195,7 @@ def main():
     if args.disable_parallel:
         results = []
         for index, row in tqdm(
-            meta.iterrows(), total=len(meta), desc="Processing rows"
+            csv.iterrows(), total=len(csv), desc="Processing rows"
         ):
             result = process_single_row_partial(row, index)
             results.append(result)
@@ -236,22 +233,21 @@ def main():
         valid_rows.append(valid)
 
     if args.drop_invalid_timestamps:
-        meta = meta[valid_rows]
-        assert args.meta_path.endswith("timestamp.csv"), "Only support *timestamp.csv"
-        meta.to_csv(
-            args.meta_path.replace("timestamp.csv", "correct_timestamp.csv"),
+        csv = csv[valid_rows]
+        assert args.csv_path.endswith("timestamp.csv"), "Only support *timestamp.csv"
+        csv.to_csv(
+            args.csv_path.replace("timestamp.csv", "correct_timestamp.csv"),
             index=False,
         )
         print(
-            f"Corrected timestamp file saved to '{args.meta_path.replace('timestamp.csv', 'correct_timestamp.csv')}'"
+            f"Corrected timestamp file saved to '{args.csv_path.replace('timestamp.csv', 'correct_timestamp.csv')}'"
         )
 
     # Save results to CSV
-    columns = meta.columns
+    columns = csv.columns
     new_df = pd.DataFrame(new_rows, columns=columns)
-    new_csv_path = os.path.join(args.csv_save_dir, "clips.csv")
-    new_df.to_csv(new_csv_path, index=False)
-    print(f"Saved {len(new_df)} clip information to {new_csv_path}.")
+    new_df.to_csv(args.csv_save_path, index=False)
+    print(f"Saved {len(new_df)} clip information to {args.csv_save_path}.")
 
 
 if __name__ == "__main__":

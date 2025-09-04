@@ -15,8 +15,6 @@ import multiprocessing as mp
 from multiprocessing import Manager
 import queue
 from tqdm import tqdm
-import shutil
-import glob
 
 
 class Pose:
@@ -230,7 +228,7 @@ def worker(task_queue, args, pbar):
 def parse_args():
     """Parse command line arguments for camera pose conversion."""
     parser = argparse.ArgumentParser(description="Convert quaternion to camera pose")
-    parser.add_argument("csv_path", type=str, help="Path to the csv file")
+    parser.add_argument("--csv_path", type=str, help="Path to the csv file")
     parser.add_argument("--dir_path", type=str, default="./outputs")
     parser.add_argument(
         "--num_workers",

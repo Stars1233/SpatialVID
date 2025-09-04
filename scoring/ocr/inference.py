@@ -72,7 +72,7 @@ def worker(task_queue, result_queue, args, id):
 def parse_args():
     """Parse command line arguments for OCR inference."""
     parser = argparse.ArgumentParser(description="SAM2 Image Predictor")
-    parser.add_argument("csv_path", type=str, help="Path to the csv file")
+    parser.add_argument("--csv_path", type=str, help="Path to the csv file")
     parser.add_argument(
         "--fig_load_dir", type=str, default="img", help="Directory containing images"
     )
@@ -87,13 +87,13 @@ def parse_args():
 def main():
     args = parse_args()
     if not os.path.exists(args.csv_path):
-        print(f"Meta file '{args.csv_path}' not found. Exit.")
+        print(f"csv file '{args.csv_path}' not found. Exit.")
         return
 
     wo_ext, ext = os.path.splitext(args.csv_path)
     out_path = f"{wo_ext}_ocr{ext}"
     if args.skip_if_existing and os.path.exists(out_path):
-        print(f"Output meta file '{out_path}' already exists. Exit.")
+        print(f"Output csv file '{out_path}' already exists. Exit.")
         exit()
 
     df = pd.read_csv(args.csv_path)
@@ -129,7 +129,7 @@ def main():
     df["ocr"] = [x[1] for x in results]
 
     df.to_csv(out_path, index=False)
-    print(f"New meta (shape={df.shape}) with ocr results saved to '{out_path}'.")
+    print(f"New csv (shape={df.shape}) with ocr results saved to '{out_path}'.")
 
 
 if __name__ == "__main__":

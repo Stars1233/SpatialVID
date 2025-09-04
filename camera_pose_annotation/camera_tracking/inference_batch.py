@@ -56,7 +56,7 @@ def worker(task_queue, args, worker_id, pbar):
 def parse_args():
     """Parse command line arguments for camera tracking batch inference."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("csv_path", type=str, help="Path to the csv file")
+    parser.add_argument("--csv_path", type=str, help="Path to the csv file")
     parser.add_argument("--dir_path", type=str, default="./outputs")
     parser.add_argument("--checkpoints_path", type=str, default="./checkpoints")
     parser.add_argument(

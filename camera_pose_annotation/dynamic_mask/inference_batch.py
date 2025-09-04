@@ -212,7 +212,7 @@ def worker(task_queue, args, id):
 def parse_args():
     """Parse command line arguments for dynamic mask generation."""
     parser = argparse.ArgumentParser(description="SAM2 Image Predictor")
-    parser.add_argument("csv_path", type=str, help="Path to the csv file")
+    parser.add_argument("--csv_path", type=str, help="Path to the csv file")
     parser.add_argument(
         "--dir_path",
         type=str,

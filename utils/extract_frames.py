@@ -83,7 +83,7 @@ def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description="Extract frames from video files")
     parser.add_argument(
-        "csv_path", type=str, help="Path to CSV file with video metadata"
+        "--csv_path", type=str, help="Path to CSV file with video csvdata"
     )
     parser.add_argument(
         "-o",
@@ -126,13 +126,13 @@ def main():
     if not os.path.exists(args.output_folder):
         os.makedirs(args.output_folder)
 
-    # Load video metadata
-    meta = pd.read_csv(args.csv_path)
+    # Load video csvdata
+    csv = pd.read_csv(args.csv_path)
 
     if args.disable_parallel:
         # Sequential processing
         for index, row in tqdm(
-            meta.iterrows(), total=len(meta), desc="Processing videos"
+            csv.iterrows(), total=len(csv), desc="Processing videos"
         ):
             process_single_row(row, index, args)
     else:
@@ -143,7 +143,7 @@ def main():
         task_queue = manager.Queue()
 
         # Add tasks to queue
-        for index, row in meta.iterrows():
+        for index, row in csv.iterrows():
             task_queue.put((index, row))
 
         # Execute workers

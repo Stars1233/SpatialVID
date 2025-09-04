@@ -222,7 +222,7 @@ def worker(task_queue, result_queue, args, worker_id):
 def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description="Camera Trajectory Evaluation")
-    parser.add_argument("csv_path", type=str, help="Path to input CSV file")
+    parser.add_argument("--csv_path", type=str, help="Path to input CSV file")
     parser.add_argument("--dir_path", type=str, default="./outputs", help="Base directory with reconstruction data")
     parser.add_argument("--output_path", type=str, default="./outputs/evaluation_results.csv", help="Output CSV path")
     parser.add_argument("--anomaly_threshold", type=int, default=2, help="Anomaly detection threshold")

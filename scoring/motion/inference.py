@@ -116,7 +116,7 @@ def worker2(task_queue, results_queue, args):
 def parse_args():
     """Parse command line arguments for motion analysis."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("meta_path", type=str)
+    parser.add_argument("--csv_path ", type=str, required=True, help="Path to the CSV file")
     parser.add_argument(
         "--temp_save_dir",
         type=str,
@@ -136,13 +136,15 @@ def parse_args():
 
 def main():
     args = parse_args()
-    meta_path = args.meta_path
-    if not os.path.exists(meta_path):
-        print(f"Meta file '{meta_path}' not found. Exit.")
-        return
 
-    meta = pd.read_csv(args.meta_path)
-    video_paths = meta["video_path"].unique()
+    wo_ext, ext = os.path.splitext(args.csv_path)
+    out_path = f"{wo_ext}_motion{ext}"
+    if args.skip_if_existing and os.path.exists(out_path):
+        print(f"Output CSV file '{out_path}' already exists. Exit.")
+        exit()
+
+    df = pd.read_csv(args.csv_path)
+    video_paths = df["video_path"].unique()
 
     if args.disable_parallel:
         # Sequential processing
@@ -152,10 +154,10 @@ def main():
             results.append(result)
 
         for index, row in tqdm(
-            meta.iterrows(), total=len(meta), desc="Calculating scores"
+            df.iterrows(), total=len(df), desc="Calculating scores"
         ):
             result = calculate_score(row, args)
-            meta.at[index, "motion"] = result
+            df.at[index, "motion"] = result
     else:
         # Parallel processing
         if args.num_workers is not None:
@@ -188,7 +190,7 @@ def main():
         result_queue = manager.Queue()
         task_queue = manager.Queue()
 
-        for index, row in meta.iterrows():
+        for index, row in df.iterrows():
             task_queue.put((index, row))
 
         with concurrent.futures.ProcessPoolExecutor(
@@ -211,13 +213,10 @@ def main():
             results.append(result_queue.get())
         results.sort(key=lambda x: x[0])
         results = list(map(lambda x: x[1], results))
-        meta["motion"] = results
+        df["motion"] = results
 
-    csv_save_path = os.path.join(
-        os.path.dirname(args.meta_path), "clips_info_motion.csv"
-    )
-    meta.to_csv(csv_save_path, index=False)
-    print(f"New meta with motion scores saved to '{csv_save_path}'.")
+    df.to_csv(out_path, index=False)
+    print(f"New df with motion scores saved to '{out_path}'.")
 
 
 if __name__ == "__main__":

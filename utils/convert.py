@@ -97,7 +97,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Convert video directory structure to CSV metadata file"
     )
-    parser.add_argument("root", type=str, help="Root directory containing video files")
+    parser.add_argument("--video_dir", type=str, help="Root directory containing video files")
     parser.add_argument("--split", type=str, default="train", help="Dataset split name")
     parser.add_argument("--info", type=str, default=None, help="Additional info file")
     parser.add_argument(
@@ -106,4 +106,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Process videos and generate metadata CSV
-    process_general_videos(args.root, args.output)
+    process_general_videos(args.video_dir, args.output)

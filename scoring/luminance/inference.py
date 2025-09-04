@@ -18,7 +18,7 @@ from torchvision.transforms.functional import pil_to_tensor
 from tqdm import tqdm
 
 
-def merge_scores(gathered_list: list, meta: pd.DataFrame):
+def merge_scores(gathered_list: list, csv: pd.DataFrame):
     """Merge luminance scores from all distributed processes."""
     # Reorder results from all processes
     indices_list = list(map(lambda x: x[0], gathered_list))
@@ -45,26 +45,26 @@ def merge_scores(gathered_list: list, meta: pd.DataFrame):
 
     # Filter duplicates from distributed processing
     unique_indices, unique_indices_idx = np.unique(flat_indices, return_index=True)
-    meta.loc[unique_indices, "lum_mean"] = flat_mean_scores[unique_indices_idx]
-    meta.loc[unique_indices, "lum_min"] = flat_min_scores[unique_indices_idx]
-    meta.loc[unique_indices, "lum_max"] = flat_max_scores[unique_indices_idx]
+    csv.loc[unique_indices, "lum_mean"] = flat_mean_scores[unique_indices_idx]
+    csv.loc[unique_indices, "lum_min"] = flat_min_scores[unique_indices_idx]
+    csv.loc[unique_indices, "lum_max"] = flat_max_scores[unique_indices_idx]
 
-    # Drop indices in meta not in unique_indices
-    meta = meta.loc[unique_indices]
-    return meta
+    # Drop indices in csv not in unique_indices
+    csv = csv.loc[unique_indices]
+    return csv
 
 
 class VideoDataset(torch.utils.data.Dataset):
     """Dataset to handle video luminance computation."""
 
-    def __init__(self, meta_path, fig_load_dir):
-        self.meta_path = meta_path
-        self.meta = pd.read_csv(meta_path)
+    def __init__(self, csv_path, fig_load_dir):
+        self.csv_path = csv_path
+        self.csv = pd.read_csv(csv_path)
         self.fig_load_dir = fig_load_dir
 
     def __getitem__(self, index):
         """Get video frames and compute luminance for a single sample."""
-        sample = self.meta.iloc[index]
+        sample = self.csv.iloc[index]
 
         # Load first 3 frames from video clip
         images_dir = os.path.join(self.fig_load_dir, sample["id"])
@@ -78,13 +78,13 @@ class VideoDataset(torch.utils.data.Dataset):
         return {"index": index, "images": images}
 
     def __len__(self):
-        return len(self.meta)
+        return len(self.csv)
 
 
 def parse_args():
     """Parse command line arguments for luminance analysis."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("meta_path", type=str, help="Path to the input CSV file")
+    parser.add_argument("--csv_path ", type=str, help="Path to the input CSV file")
     parser.add_argument("--bs", type=int, default=4, help="Batch size")
     parser.add_argument("--num_workers", type=int, default=16, help="Number of workers")
     parser.add_argument(
@@ -99,13 +99,13 @@ def parse_args():
 
 def main():
     args = parse_args()
-    meta_path = args.meta_path
+    csv_path = args.csv_path
 
-    if not os.path.exists(meta_path):
-        print(f"Metadata file '{meta_path}' not found. Exiting.")
+    if not os.path.exists(csv_path):
+        print(f"csvdata file '{csv_path}' not found. Exiting.")
         return
 
-    output_path = meta_path.replace(".csv", "_lum.csv")
+    output_path = csv_path.replace(".csv", "_lum.csv")
     if args.skip_if_existing and os.path.exists(output_path):
         print(f"Output '{output_path}' already exists. Exiting.")
         return
@@ -119,7 +119,7 @@ def main():
     )
 
     # Setup dataset and distributed dataloader
-    dataset = VideoDataset(meta_path, fig_load_dir=args.fig_load_dir)
+    dataset = VideoDataset(csv_path, fig_load_dir=args.fig_load_dir)
     dataloader = DataLoader(
         dataset,
         batch_size=args.bs,
@@ -168,9 +168,9 @@ def main():
         (indices_list, mean_scores_list, min_scores_list, max_scores_list),
     )
     if dist.get_rank() == 0:
-        meta_new = merge_scores(gathered_list, dataset.meta)
-        meta_new.to_csv(output_path, index=False)
-        print(f"New meta with luminance scores saved to '{output_path}'")
+        csv_new = merge_scores(gathered_list, dataset.csv)
+        csv_new.to_csv(output_path, index=False)
+        print(f"New csv with luminance scores saved to '{output_path}'")
 
 
 if __name__ == "__main__":

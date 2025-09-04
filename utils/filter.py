@@ -10,62 +10,10 @@ import numpy as np
 import pandas as pd
 
 
-# ======================================================
-# File I/O functions
-# ======================================================
-def read_file(input_path):
-    """Read CSV or Parquet file"""
-    if input_path.endswith(".csv"):
-        return pd.read_csv(input_path)
-    elif input_path.endswith(".parquet"):
-        return pd.read_parquet(input_path)
-    else:
-        raise NotImplementedError(f"Unsupported file format: {input_path}")
-
-
-def save_file(data, output_path):
-    """Save DataFrame to CSV or Parquet file"""
-    output_dir = os.path.dirname(output_path)
-    if not os.path.exists(output_dir) and output_dir != "":
-        os.makedirs(output_dir)
-    if output_path.endswith(".csv"):
-        return data.to_csv(output_path, index=False)
-    elif output_path.endswith(".parquet"):
-        return data.to_parquet(output_path, index=False)
-    else:
-        raise NotImplementedError(f"Unsupported file format: {output_path}")
-
-
-def read_data(input_paths):
-    """Load and concatenate multiple data files"""
-    data = []
-    input_list = []
-    for input_path in input_paths:
-        input_list.extend(glob(input_path))
-    print("Input files:", input_list)
-
-    for i, input_path in enumerate(input_list):
-        if not os.path.exists(input_path):
-            continue
-        data.append(read_file(input_path))
-        print(f"Loaded {len(data[-1])} samples from '{input_path}'.")
-
-    if len(data) == 0:
-        print(f"No samples to process. Exit.")
-        exit()
-
-    data = pd.concat(data, ignore_index=True, sort=False)
-    print(f"Total number of samples: {len(data)}")
-    return data
-
-
-# ======================================================
-# Main filtering logic
-# ======================================================
 def main(args):
     """Apply filtering criteria to dataset"""
     # Load data
-    data = read_data(args.input)
+    data = pd.read_csv(args.csv_path)
 
     # Apply filters based on various metrics
     if args.frames_min is not None:
@@ -118,10 +66,8 @@ def main(args):
         data = data[data["motion"] <= args.motion_max]
 
     # Save filtered data
-    csv_save_dir = os.path.dirname(args.input[0])
-    output_path = os.path.join(csv_save_dir, "filtered_clips.csv")
-    save_file(data, output_path)
-    print(f"Saved {len(data)} samples to {output_path}.")
+    data.to_csv(args.csv_save_path, index=False)
+    print(f"Saved {len(data)} samples to {args.csv_save_path}.")
 
 
 def parse_args():
@@ -130,14 +76,10 @@ def parse_args():
         description="Filter video dataset by quality metrics"
     )
     parser.add_argument(
-        "input", type=str, nargs="+", help="Path to input dataset files"
+        "--csv_path", type=str, nargs="+", help="Path to input CSV file"
     )
     parser.add_argument(
-        "--format",
-        type=str,
-        default="csv",
-        help="Output format",
-        choices=["csv", "parquet"],
+        "--csv_save_path", type=str, default=None, help="Path to save output CSV file"
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
 

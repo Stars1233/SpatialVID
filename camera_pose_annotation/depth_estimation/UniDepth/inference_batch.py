@@ -79,7 +79,7 @@ def collate_fn(batch):
 def parse_args():
     """Parse command line arguments for UniDepth inference."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("csv_path", type=str, help="Path to the csv file")
+    parser.add_argument("--csv_path", type=str, help="Path to the csv file")
     parser.add_argument("--dir_path", type=str, default="./vis_depth")
     parser.add_argument("--checkpoints_path", type=str, default="./checkpoints")
     parser.add_argument(

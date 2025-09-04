@@ -23,7 +23,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 from tqdm import tqdm
 
 
-def merge_scores(gathered_list: list, meta: pd.DataFrame, column):
+def merge_scores(gathered_list: list, csv: pd.DataFrame, column):
     """Merge aesthetic scores from all distributed processes."""
     # Reorder results from all processes
     indices_list = list(map(lambda x: x[0], gathered_list))
@@ -40,25 +40,25 @@ def merge_scores(gathered_list: list, meta: pd.DataFrame, column):
 
     # Filter duplicates from distributed processing
     unique_indices, unique_indices_idx = np.unique(flat_indices, return_index=True)
-    meta.loc[unique_indices, column] = flat_scores[unique_indices_idx]
+    csv.loc[unique_indices, column] = flat_scores[unique_indices_idx]
 
-    # Drop indices in meta not in unique_indices
-    meta = meta.loc[unique_indices]
-    return meta
+    # Drop indices in csv not in unique_indices
+    csv = csv.loc[unique_indices]
+    return csv
 
 
 class VideoTextDataset(torch.utils.data.Dataset):
     """Dataset for loading video frames for aesthetic scoring."""
     
-    def __init__(self, meta_path, fig_load_dir, transform=None):
-        self.meta_path = meta_path
-        self.meta = pd.read_csv(meta_path)
+    def __init__(self, csv_path, fig_load_dir, transform=None):
+        self.csv_path = csv_path
+        self.csv = pd.read_csv(csv_path)
         self.transform = transform
         self.fig_load_dir = fig_load_dir
 
     def __getitem__(self, index):
         """Load and transform video frames for a single sample."""
-        sample = self.meta.iloc[index]
+        sample = self.csv.iloc[index]
 
         # Load first 3 frames from video clip
         images_dir = os.path.join(self.fig_load_dir, sample["id"])
@@ -73,7 +73,7 @@ class VideoTextDataset(torch.utils.data.Dataset):
         return dict(index=index, images=images)
 
     def __len__(self):
-        return len(self.meta)
+        return len(self.csv)
 
 
 class MLP(nn.Module):
@@ -118,7 +118,7 @@ class AestheticScorer(nn.Module):
 def parse_args():
     """Parse command line arguments for aesthetic scoring."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("meta_path", type=str, help="Path to the input CSV file")
+    parser.add_argument("--csv_path ", type=str, help="Path to the input CSV file")
     parser.add_argument(
         "--load_num", type=int, default=4, help="Number of frames to load"
     )
@@ -142,15 +142,15 @@ def parse_args():
 def main():
     args = parse_args()
 
-    meta_path = args.meta_path
-    if not os.path.exists(meta_path):
-        print(f"Meta file '{meta_path}' not found. Exit.")
+    csv_path = args.csv_path
+    if not os.path.exists(csv_path):
+        print(f"CSV file '{csv_path}' not found. Exit.")
         exit()
 
-    wo_ext, ext = os.path.splitext(meta_path)
+    wo_ext, ext = os.path.splitext(csv_path)
     out_path = f"{wo_ext}_aes{ext}"
     if args.skip_if_existing and os.path.exists(out_path):
-        print(f"Output meta file '{out_path}' already exists. Exit.")
+        print(f"Output CSV file '{out_path}' already exists. Exit.")
         exit()
 
     # Initialize distributed processing
@@ -168,7 +168,7 @@ def main():
 
     # Build dataset and dataloader
     dataset = VideoTextDataset(
-        args.meta_path, transform=preprocess, fig_load_dir=args.fig_load_dir
+        args.csv_path, transform=preprocess, fig_load_dir=args.fig_load_dir
     )
     dataloader = DataLoader(
         dataset,
@@ -217,9 +217,9 @@ def main():
     gathered_list = [None] * dist.get_world_size()
     dist.all_gather_object(gathered_list, (indices_list, scores_list))
     if dist.get_rank() == 0:
-        meta_new = merge_scores(gathered_list, dataset.meta, column="aes")
-        meta_new.to_csv(out_path, index=False)
-        print(f"New meta with aesthetic scores saved to '{out_path}'.")
+        csv_new = merge_scores(gathered_list, dataset.csv, column="aes")
+        csv_new.to_csv(out_path, index=False)
+        print(f"New csv with aesthetic scores saved to '{out_path}'.")
 
 
 if __name__ == "__main__":

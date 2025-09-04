@@ -53,7 +53,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Merge multiple CSV files from a folder"
     )
-    parser.add_argument("folder", type=str, help="Path to folder containing CSV files")
+    parser.add_argument("--csv_dir", type=str, help="Path to folder containing CSV files")
     parser.add_argument(
         "--output", type=str, required=True, help="Output path for merged CSV file"
     )
@@ -61,12 +61,12 @@ def main():
     args = parser.parse_args()
 
     # Match CSV files with 'clips_info_' prefix
-    pattern = os.path.join(args.folder, "clips_info_*.csv")
+    pattern = os.path.join(args.csv_dir, "clips_info_*.csv")
     file_list = glob.glob(pattern)
     file_list.sort()  # Sort to ensure consistent merge order
 
     if not file_list:
-        raise ValueError(f"No matching CSV files found in folder {args.folder}!")
+        raise ValueError(f"No matching CSV files found in folder {args.csv_dir}!")
 
     print(f"Found {len(file_list)} CSV files:")
     for f in file_list:

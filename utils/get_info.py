@@ -66,56 +66,6 @@ def get_video_info(args):
         return (idx, False, 0, 0, 0, np.nan, np.nan)
 
 
-def read_file(input_path):
-    """Read CSV or Parquet file"""
-    if input_path.endswith(".csv"):
-        return pd.read_csv(input_path)
-    elif input_path.endswith(".parquet"):
-        return pd.read_parquet(input_path)
-    else:
-        raise NotImplementedError(f"Unsupported file format: {input_path}")
-
-
-def save_file(data, output_path):
-    """Save DataFrame to CSV or Parquet file"""
-    output_dir = os.path.dirname(output_path)
-    if not os.path.exists(output_dir) and output_dir != "":
-        os.makedirs(output_dir)
-    if output_path.endswith(".csv"):
-        return data.to_csv(output_path, index=False)
-    elif output_path.endswith(".parquet"):
-        return data.to_parquet(output_path, index=False)
-    else:
-        raise NotImplementedError(f"Unsupported file format: {output_path}")
-
-
-def read_data(input_paths):
-    """Load and concatenate multiple data files"""
-    data = []
-    input_name = ""
-    input_list = []
-    for input_path in input_paths:
-        input_list.extend(glob(input_path))
-    print("Input files:", input_list)
-
-    for i, input_path in enumerate(input_list):
-        if not os.path.exists(input_path):
-            continue
-        data.append(read_file(input_path))
-        input_name += os.path.basename(input_path).split(".")[0]
-        if i != len(input_list) - 1:
-            input_name += "+"
-        print(f"Loaded {len(data[-1])} samples from '{input_path}'.")
-
-    if len(data) == 0:
-        print(f"No samples to process. Exit.")
-        exit()
-
-    data = pd.concat(data, ignore_index=True, sort=False)
-    print(f"Total number of samples: {len(data)}")
-    return data, input_name
-
-
 def worker(task_queue, results_queue, args):
     """Worker function for parallel video processing"""
     while True:
@@ -131,10 +81,7 @@ def worker(task_queue, results_queue, args):
 def main(args):
     """Main function to extract video information"""
     # Load data
-    data, input_name = read_data(args.input)
-
-    # Get output path
-    output_path = get_output_path(args, input_name)
+    data = pd.read_csv(args.csv_path)
 
     # Setup multiprocessing
     from multiprocessing import Manager
@@ -196,8 +143,8 @@ def main(args):
     if "num_frames" in data.columns:
         data = data.sort_values(by="num_frames", ascending=True)
 
-    save_file(data, output_path)
-    print(f"Saved {len(data)} samples to {output_path}.")
+    data.to_csv(args.csv_save_path, index=False)
+    print(f"Saved {len(data)} samples to {args.csv_save_path}.")
 
 
 def parse_args():
@@ -206,22 +153,17 @@ def parse_args():
         description="Extract video information using multiple backends"
     )
     parser.add_argument(
-        "input", type=str, nargs="+", help="Path to input dataset files"
+        "--csv_path", type=str, required=True, help="Path to input CSV file"
     )
-    parser.add_argument("--output", type=str, default=None, help="Output file path")
+    parser.add_argument(
+        "--csv_save_path", type=str, default=None, help="Path to save output CSV file"
+    )
     parser.add_argument(
         "--backend",
         type=str,
         default="opencv",
         help="Video backend",
         choices=["opencv", "torchvision", "av"],
-    )
-    parser.add_argument(
-        "--format",
-        type=str,
-        default="csv",
-        help="Output format",
-        choices=["csv", "parquet"],
     )
     parser.add_argument(
         "--disable-parallel", action="store_true", help="Disable parallel processing"
@@ -235,24 +177,6 @@ def parse_args():
     parser.add_argument("--ext", action="store_true", help="Check if video files exist")
 
     return parser.parse_args()
-
-
-def get_output_path(args, input_name):
-    """Generate output file path based on input and arguments"""
-    if args.output is not None:
-        return args.output
-
-    name = input_name
-    dir_path = os.path.dirname(args.input[0])
-    print("dir path", dir_path)
-
-    # Add suffix based on options
-    name += "_info"
-    if args.ext:
-        name += "_ext"
-
-    output_path = os.path.join(dir_path, f"{name}.{args.format}")
-    return output_path
 
 
 if __name__ == "__main__":

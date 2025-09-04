@@ -108,7 +108,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Depth Anything V2 Distributed Inference"
     )
-    parser.add_argument("csv_path", type=str, help="Path to the csv file")
+    parser.add_argument("--csv_path", type=str, help="Path to the csv file")
     parser.add_argument("--input-size", type=int, default=518)
     parser.add_argument("--dir_path", type=str, default="./vis_depth")
     parser.add_argument(

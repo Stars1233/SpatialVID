@@ -47,7 +47,7 @@ def worker(task_queue, args, worker_id, pbar):
 def parse_args():
     """Parse command line arguments for CVD batch processing."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("csv_path", type=str, help="Path to the csv file")
+    parser.add_argument("--csv_path", type=str, help="Path to the csv file")
     parser.add_argument("--dir_path", type=str, default="./outputs")
     parser.add_argument(
         "--gpu_id", type=str, default="0", help="Comma-separated list of GPU IDs to use"

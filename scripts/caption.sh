@@ -1,54 +1,87 @@
 #!/bin/bash
+CSV=[Replace with the path to the result CSV file generated in the annotation step]
+SRC_DIR=[Replace with the path to the annotation output directory]
+OUTPUT_DIR=[Replace with the path to your output directory]
+mkdir -p ${OUTPUT_DIR}
+
+num_workers=8
+wait_time=1
 
 # VQA
-vqa_prompt_file="caption/VQA/vqa_prompt2.txt"
-vqa_model="gemini-2.0-flash"
-vqa_api_key="sk-3hsgJRTTd9492B3947a0T3BlbKFJ2Ca08307C2Ac4721ac3f" 
-vqa_num_workers=16 #线程数
-vqa_base_domain="https://cn2us02.opapi.win/"
-vqa_domain_file="caption/VQA/vqa_base_domain.txt"
-vqa_wait_time=1 #线程发送等待时间
+vqa_prompt_file=caption/VQA/prompt.txt
+vqa_model=gemini-2.0-flash
+vqa_api_key=[Replace with your api key]
+vqa_base_domain=https://www.dmxapi.cn/
 
 # LLM
-llm_prompt_dir="caption/LLM/prompts2"
-llm_num_workers=16 #线程数
-llm_wait_time=0.5 #线程发送等待时间
+llm_prompt_dir=caption/LLM
+llm_model=qwen3-30b-a3b
+llm_api_key=[Replace with your api key]
+llm_base_domain=https://dashscope.aliyuncs.com/compatible-mode/
 
-qwen_base_domain="https://dashscope.aliyuncs.com/compatible-mode/"
-qwen_api_key_file="caption/LLM/api_list2.txt"
-qwen_model_file="caption/LLM/model_list2.txt"
+# Tagging
+tag_prompt_file=caption/tagging/prompt.txt
+tag_model=qwen3-30b-a3b
+tag_api_key=[Replace with your api key]
+tag_base_domain=https://dashscope.aliyuncs.com/compatible-mode/
 
-for i in {32..35}; do
-    group_id="group_${i}"
-    # 输出当前执行的group_id
-    echo "当前: $group_id"
-    python caption/VQA/vqa_run.py \
-        --group_id $group_id \
-        --prompt_file $vqa_prompt_file \
-        --model $vqa_model \
-        --api_key $vqa_api_key \
-        --num_workers $vqa_num_workers \
-        --domain_file $vqa_domain_file \
-        --wait_time $vqa_wait_time \
-      #   --record_time # 可选参数，用于记录请求用时
+measure_time() {
+    local step_number=$1
+    shift
+    local green="\e[32m"
+    local red="\e[31m"
+    local no_color="\e[0m"
+    local yellow="\e[33m"
     
-    echo "正在清理$group_id 中VQA的错误数据"
-    python caption/VQA/clean_vqa.py $group_id
+    start_time=$(date +%s)
+    echo -e "${green}Step $step_number started at: $(date)${no_color}"
 
-    python caption/LLM/llm_run.py \
-      --group_id $group_id \
-      --prompt_dir $llm_prompt_dir \
-      --model_file $qwen_model_file \
-      --api_key_file $qwen_api_key_file \
-      --num_workers $llm_num_workers \
-      --base_domain $qwen_base_domain \
-      --wait_time $llm_wait_time \
-    #   --record_time # 可选参数，用于记录请求用时
+    "$@"
 
-    echo "正在清理$group_id 中LLM的错误数据"
-    python caption/LLM/clean_llm.py $group_id
+    end_time=$(date +%s)
+    echo -e "${red}Step $step_number finished at: $(date)${no_color}"
+    echo -e "${yellow}Duration: $((end_time - start_time)) seconds${no_color}"
+    echo "---------------------------------------"
+}
 
-    echo "合并$group_id 的数据"
-    python caption/post_caption/combine.py \
-      --group_id $group_id
-done
+# 1. VQA caption
+measure_time 1 python caption/VQA/inference.py \
+  --csv_path ${CSV} \
+  --fig_load_dir ${SRC_DIR} \
+  --output_dir ${OUTPUT_DIR} \
+  --prompt_file ${vqa_prompt_file} \
+  --model ${vqa_model} \
+  --api_key ${vqa_api_key} \
+  --base_domain ${vqa_base_domain} \
+  --num_workers ${num_workers} \
+  --wait_time ${wait_time}
+
+# 2. LLM caption
+measure_time 2 python caption/LLM/inference.py \
+  --csv_path $CSV \
+  --pose_load_dir $SRC_DIR \
+  --output_dir $OUTPUT_DIR \
+  --prompt_dir $llm_prompt_dir \
+  --model $llm_model \
+  --api_key $llm_api_key \
+  --num_workers $num_workers \
+  --base_domain $llm_base_domain \
+  --wait_time $wait_time
+
+# 3. Combine results
+measure_time 3 python caption/utils/combine.py \
+  --csv_path $CSV \
+  --load_dir $OUTPUT_DIR \
+  --output_dir $OUTPUT_DIR/results \
+  --num_workers $num_workers
+
+# 4. Add tags
+python caption/tagging/inference.py \
+    --csv_path $CSV \
+    --json_load_dir $OUTPUT_DIR/results \
+    --prompt_file $tag_prompt_file \
+    --model $tag_model \
+    --api_key $tag_api_key \
+    --num_workers $num_workers \
+    --base_domain $tag_base_domain \
+    --wait_time $wait_time
