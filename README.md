@@ -1,27 +1,30 @@
-<h1 align='center'>SpatialVid: A Large Scale Video Dataset with 3D Annotations</h1>
+<h1 align='center'>SpatialVID: A Large Scale Video Dataset with Spatial Annotations</h1>
 <div align='center'>
-    <a href='#' target='_blank'>Jiahao Wang</a>,
-    <a href='#' target='_blank'>Yufeng Yuan</a>,
-    <a href='#' target='_blank'>Rujie Zheng</a>,
-    <a href='#' target='_blank'>Youtian Lin</a>,
-    <a href='#' target='_blank'>Yi Zhang</a>,
-    <a href='#' target='_blank'>Yajie Bao</a>,
+    <a href='#' target='_blank'>Jiahao Wang</a><sup>1</sup> 
+    <a href='#' target='_blank'>Yufeng Yuan</a><sup>1</sup> 
+    <a href='#' target='_blank'>Rujie Zheng</a><sup>1</sup> 
+    <a href='#' target='_blank'>Youtian Lin</a><sup>1</sup> 
+    <a href='#' target='_blank'>Yi Zhang</a><sup>1</sup> 
+    <a href='#' target='_blank'>Yajie Bao</a><sup>1</sup> 
+    <a href='#' target='_blank'>Lin-Zhuo Chen</a><sup>1</sup> 
+    <a href='#' target='_blank'>Yanxi Zhou</a><sup>1</sup> 
 </div>
 <div align='center'>
-    <a href='#' target='_blank'>Lin-Zhuo Chen</a>,
-    <a href='#' target='_blank'>Yanxi Zhou</a>,
-    <a href='#' target='_blank'>Xun Cao</a>,
-    <a href='#' target='_blank'>Yao Yao</a><sup>†</sup>
+    <a href='#' target='_blank'>Xiaoxiao Long</a><sup>1</sup> 
+    <a href='#' target='_blank'>Hao Zhu</a><sup>1</sup> 
+    <a href='#' target='_blank'>Zhaoxiang Zhang</a><sup>2</sup> 
+    <a href='#' target='_blank'>Xun Cao</a><sup>1</sup> 
+    <a href='#' target='_blank'>Yao Yao</a><sup>1†</sup>
 </div>
 <div align='center'>
-    Nanjing University
+    <sup>1</sup>Nanjing University  <sup>2</sup>Institute of Automation, Chinese Academy of Science 
 </div>
 <br>
 <div align="center">
-  <a href="https://nju-pcalab.github.io/projects/openvid/"><img src="https://img.shields.io/static/v1?label=SpatialVid&message=Project&color=purple"></a>  
+  <a href="https://nju-pcalab.github.io/projects/openvid/"><img src="https://img.shields.io/static/v1?label=SpatialVID&message=Project&color=purple"></a>  
   <a href="https://arxiv.org/abs/2407.02371"><img src="https://img.shields.io/static/v1?label=Paper&message=Arxiv&color=red&logo=arxiv"></a>  
   <a href="https://github.com/opencam-vid/SpatialVid"><img src="https://img.shields.io/static/v1?label=Code&message=Github&color=blue&logo=github"></a>  
-  <a href="https://huggingface.co/SpatialVid"><img src="https://img.shields.io/static/v1?label=Dataset&message=HuggingFace&color=yellow&logo=huggingface"></a>  
+  <a href="https://huggingface.co/SpatialVID"><img src="https://img.shields.io/static/v1?label=Dataset&message=HuggingFace&color=yellow&logo=huggingface"></a>  
 </div>
 <p align="center">
   <img src="assets/overview.png"  height=400>
@@ -35,7 +38,7 @@ Significant progress has been made in spatial intelligence, spanning both spatia
 
 ## 🎉NEWS
 
-+ [2025.09.01] 🔥 Our paper, code and SpatialVid-HQ dataset are released!
++ [2025.09.08] 🔥 Our paper, code and SpatialVid-HQ dataset are released!
 
 ## Preparation
 
@@ -141,6 +144,12 @@ The whole pipeline is illustrated in the figure below:
    - `SRC_DIR` is the annotation output directory, default is the same as the `OUTPUT_DIR` in the annotation step.
    - `OUTPUT_DIR` is the directory where the output files will be saved.
    - The API keys for the LLM models used in the captioning step. You can replace them with your own API keys.
+
+## Dataset Download
+
+Apart from downloading the dataset using terminal commands, we provide scripts to download the SpatialVID/SpatialVID-HQ dataset from HuggingFace. Please refer to the [`download_SpatialVID.py`](utils/download_SpatialVID.py) script for more details.
+
+We also provide our script to download the raw videos from YouTube. You can refer to the [`download_raw_videos.py`](utils/download_raw_videos.py) script for more details.
 
 ## References
 
