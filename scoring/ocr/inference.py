@@ -126,7 +126,7 @@ def main():
         index, area_list = result_queue.get()
         results.append((index, area_list))
     results.sort(key=lambda x: x[0])
-    df["ocr"] = [x[1] for x in results]
+    df["ocr score"] = [x[1] for x in results]
 
     df.to_csv(out_path, index=False)
     print(f"New csv (shape={df.shape}) with ocr results saved to '{out_path}'.")

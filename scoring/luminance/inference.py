@@ -45,9 +45,9 @@ def merge_scores(gathered_list: list, csv: pd.DataFrame):
 
     # Filter duplicates from distributed processing
     unique_indices, unique_indices_idx = np.unique(flat_indices, return_index=True)
-    csv.loc[unique_indices, "lum_mean"] = flat_mean_scores[unique_indices_idx]
-    csv.loc[unique_indices, "lum_min"] = flat_min_scores[unique_indices_idx]
-    csv.loc[unique_indices, "lum_max"] = flat_max_scores[unique_indices_idx]
+    csv.loc[unique_indices, "luminance mean"] = flat_mean_scores[unique_indices_idx]
+    csv.loc[unique_indices, "luminance min"] = flat_min_scores[unique_indices_idx]
+    csv.loc[unique_indices, "luminance max"] = flat_max_scores[unique_indices_idx]
 
     # Drop indices in csv not in unique_indices
     csv = csv.loc[unique_indices]

@@ -35,35 +35,26 @@ def main(args):
             data["resolution"] = height * width
         data = data[data["resolution"] <= args.resolution_max]
     if args.aes_min is not None:
-        assert "aes" in data.columns
-        data = data[data["aes"] >= args.aes_min]
+        assert "aesthetic score" in data.columns
+        data = data[data["aesthetic score"] >= args.aes_min]
     if args.ocr_max is not None:
-        assert "ocr" in data.columns
-        data = data[data["ocr"] <= args.ocr_max]
+        assert "ocr score" in data.columns
+        data = data[data["ocr score"] <= args.ocr_max]
     if args.ocr_min is not None:
-        assert "ocr" in data.columns
-        data = data[data["ocr"] >= args.ocr_min]
+        assert "ocr score" in data.columns
+        data = data[data["ocr score"] >= args.ocr_min]
     if args.lum_min is not None:
-        assert "lum_mean" in data.columns
-        data = data[data["lum_mean"] >= args.lum_min]
+        assert "luminance mean" in data.columns
+        data = data[data["luminance mean"] >= args.lum_min]
     if args.lum_max is not None:
-        assert "lum_mean" in data.columns
-        data = data[data["lum_mean"] <= args.lum_max]
-    if args.blur_max is not None:
-        assert "blur" in data.columns
-        data = data[data["blur"] <= args.blur_max]
-    if args.flow_min is not None:
-        assert "flow_mean" in data.columns
-        data = data[data["flow_mean"] >= args.flow_min]
-    if args.flow_max is not None:
-        assert "flow_mean" in data.columns
-        data = data[data["flow_mean"] <= args.flow_max]
+        assert "luminance mean" in data.columns
+        data = data[data["luminance mean"] <= args.lum_max]
     if args.motion_min is not None:
-        assert "motion" in data.columns
-        data = data[data["motion"] >= args.motion_min]
+        assert "motion score" in data.columns
+        data = data[data["motion score"] >= args.motion_min]
     if args.motion_max is not None:
-        assert "motion" in data.columns
-        data = data[data["motion"] <= args.motion_max]
+        assert "motion score" in data.columns
+        data = data[data["motion score"] <= args.motion_max]
 
     # Save filtered data
     data.to_csv(args.csv_save_path, index=False)

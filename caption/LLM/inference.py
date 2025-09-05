@@ -51,7 +51,7 @@ def get_pose(pose_dir):
     return poses_str
 
 
-def get_prompt(pose_dir, prompt_dir, vqa_caption, motion_intensity):
+def get_prompt(pose_dir, prompt_dir, vqa_caption, dist_level):
     """
     Construct a prompt by combining content from prompt1.txt, prompt2.txt, VQA caption, and pose data
     """
@@ -70,7 +70,7 @@ def get_prompt(pose_dir, prompt_dir, vqa_caption, motion_intensity):
 
     # Assemble final prompt
     prompt = (f"{p1_content}\nGiven Information:\n{vqa_caption}\n3.Camera Position Data:\n{poses}\n"
-              f"\n4.Motion intensity:\n{motion_intensity}\n{p2_content}")
+              f"\n4.Motion intensity:\n{dist_level}\n{p2_content}")
 
     return prompt
 
@@ -94,7 +94,7 @@ def process_single_row(args, row):
     # Call API with retry mechanism
     pose_dir = os.path.join(args.pose_load_dir, row["id"], "reconstructions")
     prompt_text = get_prompt(pose_dir, args.prompt_dir,
-                             vqa_caption, row["motion_intensity"])
+                             vqa_caption, row["distLevel"])
     llm_caption = api_call(prompt_text, args.model,
                            args.api_key, args.base_domain)
     assert llm_caption is not None, f"API call failed for id {row['id']}"
@@ -194,10 +194,6 @@ def main():
 
     # Read CSV file containing scene information
     df = pd.read_csv(args.csv_path)
-
-    # Column indices for data extraction
-    subdir_col_idx = 1  # Index of column containing directory names
-    motion_intensity_col_idx = 21  # Index of column containing motion intensity
 
     # Initialize task queue with all rows
     manager = Manager()

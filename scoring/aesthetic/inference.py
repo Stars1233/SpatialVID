@@ -217,7 +217,7 @@ def main():
     gathered_list = [None] * dist.get_world_size()
     dist.all_gather_object(gathered_list, (indices_list, scores_list))
     if dist.get_rank() == 0:
-        csv_new = merge_scores(gathered_list, dataset.csv, column="aes")
+        csv_new = merge_scores(gathered_list, dataset.csv, column="aesthetic score")
         csv_new.to_csv(out_path, index=False)
         print(f"New csv with aesthetic scores saved to '{out_path}'.")
 

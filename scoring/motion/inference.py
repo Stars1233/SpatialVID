@@ -214,7 +214,7 @@ def main():
             results.append(result_queue.get())
         results.sort(key=lambda x: x[0])
         results = list(map(lambda x: x[1], results))
-        df["motion"] = results
+        df["motion score"] = results
 
     df.to_csv(out_path, index=False)
     print(f"New df with motion scores saved to '{out_path}'.")
