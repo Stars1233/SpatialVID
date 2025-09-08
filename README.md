@@ -1,29 +1,29 @@
 <h1 align='center'>SpatialVID: A Large Scale Video Dataset with Spatial Annotations</h1>
 <div align='center'>
     <a href='#' target='_blank'>Jiahao Wang</a><sup>1</sup> 
-    <a href='#' target='_blank'>Yufeng Yuan</a><sup>1</sup> 
+    <a href='https://github.com/FelixYuan-YF' target='_blank'>Yufeng Yuan</a><sup>1</sup> 
     <a href='#' target='_blank'>Rujie Zheng</a><sup>1</sup> 
-    <a href='#' target='_blank'>Youtian Lin</a><sup>1</sup> 
+    <a href='https://linyou.github.io' target='_blank'>Youtian Lin</a><sup>1</sup> 
     <a href='#' target='_blank'>Yi Zhang</a><sup>1</sup> 
     <a href='#' target='_blank'>Yajie Bao</a><sup>1</sup> 
-    <a href='#' target='_blank'>Lin-Zhuo Chen</a><sup>1</sup> 
-    <a href='#' target='_blank'>Yanxi Zhou</a><sup>1</sup> 
+    <a href='https://linzhuo.xyz' target='_blank'>Lin-Zhuo Chen</a><sup>1</sup> 
 </div>
 <div align='center'>
+    <a href='https://github.com/yxzhou217' target='_blank'>Yanxi Zhou</a><sup>1</sup> 
     <a href='#' target='_blank'>Xiaoxiao Long</a><sup>1</sup> 
     <a href='#' target='_blank'>Hao Zhu</a><sup>1</sup> 
-    <a href='#' target='_blank'>Zhaoxiang Zhang</a><sup>2</sup> 
+    <a href='http://zhaoxiangzhang.net/' target='_blank'>Zhaoxiang Zhang</a><sup>2</sup> 
     <a href='#' target='_blank'>Xun Cao</a><sup>1</sup> 
-    <a href='#' target='_blank'>Yao Yao</a><sup>1†</sup>
+    <a href='https://yoyo000.github.io/' target='_blank'>Yao Yao</a><sup>1†</sup>
 </div>
 <div align='center'>
     <sup>1</sup>Nanjing University  <sup>2</sup>Institute of Automation, Chinese Academy of Science 
 </div>
 <br>
 <div align="center">
-  <a href="https://nju-pcalab.github.io/projects/openvid/"><img src="https://img.shields.io/static/v1?label=SpatialVID&message=Project&color=purple"></a>  
+  <a href="https://nju-3dv.github.io/projects/SpatialVID/"><img src="https://img.shields.io/static/v1?label=SpatialVID&message=Project&color=purple"></a>  
   <a href="https://arxiv.org/abs/2407.02371"><img src="https://img.shields.io/static/v1?label=Paper&message=Arxiv&color=red&logo=arxiv"></a>  
-  <a href="https://github.com/opencam-vid/SpatialVid"><img src="https://img.shields.io/static/v1?label=Code&message=Github&color=blue&logo=github"></a>  
+  <a href="https://github.com/NJU-3DV/spatialVID"><img src="https://img.shields.io/static/v1?label=Code&message=Github&color=blue&logo=github"></a>  
   <a href="https://huggingface.co/SpatialVID"><img src="https://img.shields.io/static/v1?label=Dataset&message=HuggingFace&color=yellow&logo=huggingface"></a>  
 </div>
 <p align="center">

@@ -161,7 +161,7 @@ def trajectory_turns(cam_pos, time_steps, device, threshold=0.45):
     if max_angle > threshold and max_angle not in peaks_values:
         peaks_values.append(max_angle)
 
-    return peaks_values, len(peaks_values)
+    return len(peaks_values)
 
 
 def dynamic_ratio(masks):
