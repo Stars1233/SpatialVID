@@ -45,7 +45,7 @@ Significant progress has been made in spatial intelligence, spanning both spatia
 1. Necessary packages
 
    ```bash
-   git clone --recursive https://github.com/opencam-vid/SpatialVid.git
+   git clone --recursive https://github.com/NJU-3DV/SpatialVID.git
    cd SpatialVid
    conda create -n SpatialVID python=3.10.13
    conda activate SpatialVID
