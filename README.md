@@ -1,11 +1,11 @@
 <h1 align='center'>SpatialVID: A Large-Scale Video Dataset with Spatial Annotations</h1>
 <div align='center'>
-    <a href='https://github.com/oiiiwjh' target='_blank'>Jiahao Wang</a><sup>1*</sup> 
+    <a href='https://oiiiwjh.github.io/' target='_blank'>Jiahao Wang</a><sup>1*</sup> 
     <a href='https://github.com/FelixYuan-YF' target='_blank'>Yufeng Yuan</a><sup>1*</sup> 
     <a href='https://github.com/zrj-cn' target='_blank'>Rujie Zheng</a><sup>1*</sup> 
     <a href='https://linyou.github.io' target='_blank'>Youtian Lin</a><sup>1</sup> 
-    <a href='#' target='_blank'>Yi Zhang</a><sup>1</sup> 
-    <a href='#' target='_blank'>Yajie Bao</a><sup>1</sup> 
+    <a href='https://github.com/YeeZ93' target='_blank'>Yi Zhang</a><sup>1</sup> 
+    <a href='https://openreview.net/profile?id=~yajie_bao5' target='_blank'>Yajie Bao</a><sup>1</sup> 
     <a href='https://linzhuo.xyz' target='_blank'>Lin-Zhuo Chen</a><sup>1</sup> 
 </div>
 <div align='center'>
