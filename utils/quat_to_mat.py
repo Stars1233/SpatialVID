@@ -208,8 +208,8 @@ def possess_single_row(row, index, args):
     cam_pos_file = os.path.join(dir_path, "poses.npy")
     if not os.path.exists(cam_pos_file):
         return
-    c2w_file = os.path.join(dir_path, "c2w_poses.npy")
-    if os.path.exists(c2w_file):
+    output_file = os.path.join(dir_path, "extrinsics.npy")
+    if os.path.exists(output_file):
         return
 
     # Load quaternion poses
@@ -220,7 +220,7 @@ def possess_single_row(row, index, args):
     # Convert w2c matrices to c2w matrices (N,v,3,4)
     if args.format == "c2w":
         poses = Pose().invert(poses)
-    np.save(c2w_file, poses)
+    np.save(output_file, poses)
 
 
 def worker(task_queue, args, pbar):
