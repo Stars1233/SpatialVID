@@ -196,7 +196,7 @@ def pose_from_quaternion(pose):
 
 def possess_single_row(row, index, args):
     """
-    Process a single row to convert camera poses from w2c to c2w format.
+    Process a single row to convert camera poses to c2w/w2c format.
 
     Args:
         row: Data row containing video ID
