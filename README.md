@@ -1,8 +1,8 @@
-<h1 align='center'>SpatialVID: A Large Scale Video Dataset with Spatial Annotations</h1>
+<h1 align='center'>SpatialVID: A Large-Scale Video Dataset with Spatial Annotations</h1>
 <div align='center'>
-    <a href='#' target='_blank'>Jiahao Wang</a><sup>1</sup> 
-    <a href='https://github.com/FelixYuan-YF' target='_blank'>Yufeng Yuan</a><sup>1</sup> 
-    <a href='#' target='_blank'>Rujie Zheng</a><sup>1</sup> 
+    <a href='https://github.com/oiiiwjh' target='_blank'>Jiahao Wang</a><sup>1*</sup> 
+    <a href='https://github.com/FelixYuan-YF' target='_blank'>Yufeng Yuan</a><sup>1*</sup> 
+    <a href='https://github.com/zrj-cn' target='_blank'>Rujie Zheng</a><sup>1*</sup> 
     <a href='https://linyou.github.io' target='_blank'>Youtian Lin</a><sup>1</sup> 
     <a href='#' target='_blank'>Yi Zhang</a><sup>1</sup> 
     <a href='#' target='_blank'>Yajie Bao</a><sup>1</sup> 
@@ -10,10 +10,10 @@
 </div>
 <div align='center'>
     <a href='https://github.com/yxzhou217' target='_blank'>Yanxi Zhou</a><sup>1</sup> 
-    <a href='#' target='_blank'>Xiaoxiao Long</a><sup>1</sup> 
-    <a href='#' target='_blank'>Hao Zhu</a><sup>1</sup> 
+    <a href='https://www.xxlong.site/index.html' target='_blank'>Xiaoxiao Long</a><sup>1</sup> 
+    <a href='http://zhuhao.cc/home/' target='_blank'>Hao Zhu</a><sup>1</sup> 
     <a href='http://zhaoxiangzhang.net/' target='_blank'>Zhaoxiang Zhang</a><sup>2</sup> 
-    <a href='#' target='_blank'>Xun Cao</a><sup>1</sup> 
+    <a href='https://cite.nju.edu.cn' target='_blank'>Xun Cao</a><sup>1</sup> 
     <a href='https://yoyo000.github.io/' target='_blank'>Yao Yao</a><sup>1†</sup>
 </div>
 <div align='center'>
@@ -22,8 +22,8 @@
 <br>
 <div align="center">
   <a href="https://nju-3dv.github.io/projects/SpatialVID/"><img src="https://img.shields.io/static/v1?label=SpatialVID&message=Project&color=purple"></a>  
-  <a href="https://arxiv.org/abs/2407.02371"><img src="https://img.shields.io/static/v1?label=Paper&message=Arxiv&color=red&logo=arxiv"></a>  
-  <a href="https://github.com/NJU-3DV/spatialVID"><img src="https://img.shields.io/static/v1?label=Code&message=Github&color=blue&logo=github"></a>  
+  <a href="#"><img src="https://img.shields.io/static/v1?label=Paper&message=Arxiv&color=red&logo=arxiv"></a>  
+  <a href="https://github.com/NJU-3DV/SpatialVID"><img src="https://img.shields.io/static/v1?label=Code&message=Github&color=blue&logo=github"></a>  
   <a href="https://huggingface.co/SpatialVID"><img src="https://img.shields.io/static/v1?label=Dataset&message=HuggingFace&color=yellow&logo=huggingface"></a>  
 </div>
 <p align="center">
@@ -33,8 +33,6 @@
 ## Abstract
 
 Significant progress has been made in spatial intelligence, spanning both spatial reconstruction and world exploration. However, the scalability and real-world fidelity of current models remain severely constrained by the scarcity of large-scale, high-quality training data. While several datasets provide camera pose information, they are typically limited in scale, diversity, and annotation richness, particularly for dynamic scenes with realistic camera motion. To address this gap, we collect a large corpus of raw video with natural camera movement, providing the foundation for constructing a dataset with unique scale and diversity. In this work, we introduce **SpatialVID**, a large-scale dynamic spatial dataset explicitly designed to provide expressive annotations for this purpose. Through a hierarchical filtering pipeline, we process more than **21,000 hours** of collected raw video into **2.7 million clips**, totaling **7,089 hours** of dynamic content. A subsequent annotation pipeline enriches these clips with detailed spatial and semantic information, including camera poses, depth maps, dynamic masks, structured captions, and labels for camera motion and scene composition.
-
-<!-- Thorough analysis of the data demonstrates that models trained on **SpatialVID** achieve significantly improved generalization and performance relative to existing datasets, establishing it as a key asset for researchers. -->
 
 ## 🎉NEWS
 

@@ -56,7 +56,7 @@ def worker(task_queue, result_queue, args, id):
         device=device,
         use_doc_orientation_classify=False,  # Disable document orientation classification
         use_doc_unwarping=False,  # Disable text image correction
-        use_textline_orientation=False  # Disable text line orientation classification
+        use_textline_orientation=False,  # Disable text line orientation classification
     )
 
     while True:
@@ -81,6 +81,9 @@ def parse_args():
     )
     parser.add_argument("--gpu_num", type=int, default=1, help="gpu number")
     parser.add_argument("--skip_if_existing", action="store_true")
+    parser.add_argument(
+        "--disable_parallel", action="store_true", help="Disable parallel processing"
+    )
     return parser.parse_args()
 
 
@@ -97,34 +100,51 @@ def main():
         exit()
 
     df = pd.read_csv(args.csv_path)
-
-    # Set up multiprocessing queues
-    manager = Manager()
-    task_queue = manager.Queue()
-    result_queue = manager.Queue()
-    for index, row in df.iterrows():
-        task_queue.put((index, row))
-
-    # Process tasks with multiple workers
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=args.num_workers
-    ) as executor:
-        futures = []
-        for id in range(args.num_workers):
-            futures.append(executor.submit(worker, task_queue, result_queue, args, id))
-
-        for future in tqdm(
-            concurrent.futures.as_completed(futures),
-            total=len(futures),
-            desc="Finished workers",
-        ):
-            future.result()
-
-    # Collect and sort results
     results = []
-    while not result_queue.empty():
-        index, area_list = result_queue.get()
-        results.append((index, area_list))
+
+    if args.disable_parallel:
+        # Sequential processing
+        model = PaddleOCR(
+            device="gpu:0",  # if torch.cuda.is_available() else "cpu"
+            use_doc_orientation_classify=False,  # Disable document orientation classification
+            use_doc_unwarping=False,  # Disable text image correction
+            use_textline_orientation=False,  # Disable text line orientation classification
+        )
+        ocr_scores = []
+        for index, row in tqdm(df.iterrows(), total=len(df), desc="Processing rows"):
+            score = process_single_row(row, args, model)
+            ocr_scores.append(score)
+            results.append((index, score))
+    else:
+        # Set up multiprocessing queues
+        manager = Manager()
+        task_queue = manager.Queue()
+        result_queue = manager.Queue()
+        for index, row in df.iterrows():
+            task_queue.put((index, row))
+
+        # Process tasks with multiple workers
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=args.num_workers
+        ) as executor:
+            futures = []
+            for id in range(args.num_workers):
+                futures.append(
+                    executor.submit(worker, task_queue, result_queue, args, id)
+                )
+
+            for future in tqdm(
+                concurrent.futures.as_completed(futures),
+                total=len(futures),
+                desc="Finished workers",
+            ):
+                future.result()
+
+        # Collect and sort results
+        while not result_queue.empty():
+            index, area_list = result_queue.get()
+            results.append((index, area_list))
+
     results.sort(key=lambda x: x[0])
     df["ocr score"] = [x[1] for x in results]
 

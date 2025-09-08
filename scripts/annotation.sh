@@ -88,14 +88,22 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 6 python utils/evaluat
   --num_workers $((GPU_NUM * 2)) \
   --output_path ${OUTPUT_DIR}/final_results.csv
 
-# 7. Convert the output poses.npy into a c2w matrix
-CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 7 python utils/c2w.py \
+# 7. Get motion instructions
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 7 python utils/get_instructions.py \
   --csv_path ${CSV} \
   --dir_path ${OUTPUT_DIR} \
+  --interval 2 \
   --num_workers $((GPU_NUM * 2))
 
 # 8. Normalize the intrinsics
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 8 python utils/normalize_intrinsics.py \
   --csv_path ${CSV} \
+  --dir_path ${OUTPUT_DIR} \
+  --num_workers $((GPU_NUM * 2))
+
+# [Optional] Convert the output poses.npy into a c2w/w2c matrix
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 9 python utils/quat_to_mat.py \
+  --csv_path ${CSV} \
+  --format c2w \
   --dir_path ${OUTPUT_DIR} \
   --num_workers $((GPU_NUM * 2))

@@ -1,6 +1,11 @@
 """
-Camera pose conversion utility to camera-to-world (c2w).
+Camera pose conversion utility to camera-to-world (c2w) or world-to-camera (w2c) format.
 Converts quaternion representations to rotation matrices and handles pose transformations.
+
+This module provides utilities for:
+- Converting between quaternion and matrix representations of camera poses
+- Transforming between world-to-camera (w2c) and camera-to-world (c2w) coordinate systems
+- Parallel processing of pose conversion for large datasets
 """
 
 import einops
@@ -57,18 +62,22 @@ class Pose:
 
     def invert(self, pose, use_inverse=False):  # c2w <==> w2c
         """
-        Invert a camera pose.
+        Invert a camera pose transformation matrix.
+        Converts between camera-to-world (c2w) and world-to-camera (w2c) representations.
+        For a pose [R|t], the inverse is [R^T | -R^T*t].
 
         Args:
-            pose: Camera pose matrix [...,3,4]
-            use_inverse: Whether to use matrix inverse instead of transpose
+            pose: Camera pose matrix [...,3,4] with shape [R|t]
+            use_inverse: Whether to use matrix inverse instead of transpose for rotation
 
         Returns:
             pose_inv: Inverted camera pose matrix [...,3,4]
         """
         R, t = pose[..., :3], pose[..., 3:]
-        R_inv = R.inverse() if use_inverse else R.transpose(0, 2, 1)
-        t_inv = (-R_inv @ t)[..., 0]
+        R_inv = (
+            R.inverse() if use_inverse else R.transpose(0, 2, 1)
+        )  # For orthogonal matrices, transpose equals inverse
+        t_inv = (-R_inv @ t)[..., 0]  # Apply inverse rotation to negative translation
         pose_inv = self(R=R_inv, t=t_inv)
         return pose_inv
 
@@ -209,8 +218,9 @@ def possess_single_row(row, index, args):
     poses = pose_from_quaternion(pose)
     poses = poses.cpu().numpy()
     # Convert w2c matrices to c2w matrices (N,v,3,4)
-    pose_inv = Pose().invert(poses)
-    np.save(c2w_file, pose_inv)
+    if args.format == "c2w":
+        poses = Pose().invert(poses)
+    np.save(c2w_file, poses)
 
 
 def worker(task_queue, args, pbar):
@@ -230,6 +240,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Convert quaternion to camera pose")
     parser.add_argument("--csv_path", type=str, help="Path to the csv file")
     parser.add_argument("--dir_path", type=str, default="./outputs")
+    parser.add_argument("--format", type=str, default="c2w", choices=["c2w", "w2c"])
     parser.add_argument(
         "--num_workers",
         type=int,
