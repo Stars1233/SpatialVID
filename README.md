@@ -4,15 +4,18 @@
     <a href='https://github.com/FelixYuan-YF' target='_blank'>Yufeng Yuan</a><sup>1*</sup> 
     <a href='https://github.com/zrj-cn' target='_blank'>Rujie Zheng</a><sup>1*</sup> 
     <a href='https://linyou.github.io' target='_blank'>Youtian Lin</a><sup>1</sup> 
-    <a href='https://github.com/YeeZ93' target='_blank'>Yi Zhang</a><sup>1</sup> 
-    <a href='https://openreview.net/profile?id=~yajie_bao5' target='_blank'>Yajie Bao</a><sup>1</sup> 
+    <a href='https://ygaojiany.github.io' target='_blank'>Jian Gao</a><sup>1</sup> 
     <a href='https://linzhuo.xyz' target='_blank'>Lin-Zhuo Chen</a><sup>1</sup> 
 </div>
 <div align='center'>
-    <a href='https://ygaojiany.github.io' target='_blank'>Jian Gao</a><sup>1</sup> 
+    <a href='https://openreview.net/profile?id=~yajie_bao5' target='_blank'>Yajie Bao</a><sup>1</sup> 
+    <a href='https://github.com/YeeZ93' target='_blank'>Yi Zhang</a><sup>1</sup> 
+    <a href='#' target='_blank'>Chang Zeng</a><sup>1</sup> 
     <a href='https://github.com/yxzhou217' target='_blank'>Yanxi Zhou</a><sup>1</sup> 
     <a href='https://www.xxlong.site/index.html' target='_blank'>Xiaoxiao Long</a><sup>1</sup> 
     <a href='http://zhuhao.cc/home/' target='_blank'>Hao Zhu</a><sup>1</sup> 
+</div>
+<div align='center'>
     <a href='http://zhaoxiangzhang.net/' target='_blank'>Zhaoxiang Zhang</a><sup>2</sup> 
     <a href='https://cite.nju.edu.cn' target='_blank'>Xun Cao</a><sup>1</sup> 
     <a href='https://yoyo000.github.io/' target='_blank'>Yao Yao</a><sup>1†</sup>
