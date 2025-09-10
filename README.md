@@ -9,6 +9,7 @@
     <a href='https://linzhuo.xyz' target='_blank'>Lin-Zhuo Chen</a><sup>1</sup> 
 </div>
 <div align='center'>
+    <a href='https://ygaojiany.github.io' target='_blank'>Jian Gao</a><sup>1</sup> 
     <a href='https://github.com/yxzhou217' target='_blank'>Yanxi Zhou</a><sup>1</sup> 
     <a href='https://www.xxlong.site/index.html' target='_blank'>Xiaoxiao Long</a><sup>1</sup> 
     <a href='http://zhuhao.cc/home/' target='_blank'>Hao Zhu</a><sup>1</sup> 
@@ -165,5 +166,10 @@ This project is licensed under Apache License. However, if you use MegaSaM or ot
 ## Citation
 
 ```bibtex
-
+@article{wang2025spatialvid,
+  title={SpatialVID: A Large-Scale Video Dataset with Spatial Annotations},
+  author={Jiahao Wang and Yufeng Yuan and Rujie Zheng and Youtian Lin and Jian Gao and Lin-Zhuo Chen and Yajie Bao and Chang Zeng and Yanxi Zhou and Yi Zhang and Xiaoxiao Long and Hao Zhu and Zhaoxiang Zhang and Xun Cao and Yao Yao},
+  journal={arXiv},
+  year={2025}
+}
 ```
