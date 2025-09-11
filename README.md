@@ -10,7 +10,7 @@
 <div align='center'>
     <a href='https://openreview.net/profile?id=~yajie_bao5' target='_blank'>Yajie Bao</a><sup>1</sup> 
     <a href='https://github.com/YeeZ93' target='_blank'>Yi Zhang</a><sup>1</sup> 
-    <a href='#' target='_blank'>Chang Zeng</a><sup>1</sup> 
+    <a href='https://github.com/ozchango' target='_blank'>Chang Zeng</a><sup>1</sup> 
     <a href='https://github.com/yxzhou217' target='_blank'>Yanxi Zhou</a><sup>1</sup> 
     <a href='https://www.xxlong.site/index.html' target='_blank'>Xiaoxiao Long</a><sup>1</sup> 
     <a href='http://zhuhao.cc/home/' target='_blank'>Hao Zhu</a><sup>1</sup> 
