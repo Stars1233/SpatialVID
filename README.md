@@ -17,7 +17,7 @@
 </div>
 <div align='center'>
     <a href='http://zhaoxiangzhang.net/' target='_blank'>Zhaoxiang Zhang</a><sup>2</sup> 
-    <a href='https://cite.nju.edu.cn' target='_blank'>Xun Cao</a><sup>1</sup> 
+    <a href='https://cite.nju.edu.cn/People/Faculty/20190621/i5054.html' target='_blank'>Xun Cao</a><sup>1</sup> 
     <a href='https://yoyo000.github.io/' target='_blank'>Yao Yao</a><sup>1†</sup>
 </div>
 <div align='center'>
@@ -36,11 +36,11 @@
 
 ## Abstract
 
-Significant progress has been made in spatial intelligence, spanning both spatial reconstruction and world exploration. However, the scalability and real-world fidelity of current models remain severely constrained by the scarcity of large-scale, high-quality training data. While several datasets provide camera pose information, they are typically limited in scale, diversity, and annotation richness, particularly for dynamic scenes with realistic camera motion. To address this gap, we collect a large corpus of raw video with natural camera movement, providing the foundation for constructing a dataset with unique scale and diversity. In this work, we introduce **SpatialVID**, a large-scale dynamic spatial dataset explicitly designed to provide expressive annotations for this purpose. Through a hierarchical filtering pipeline, we process more than **21,000 hours** of collected raw video into **2.7 million clips**, totaling **7,089 hours** of dynamic content. A subsequent annotation pipeline enriches these clips with detailed spatial and semantic information, including camera poses, depth maps, dynamic masks, structured captions, and labels for camera motion and scene composition.
+Significant progress has been made in spatial intelligence, spanning both spatial reconstruction and world exploration. However, the scalability and real-world fidelity of current models remain severely constrained by the scarcity of large-scale, high-quality training data. While several datasets provide camera pose information, they are typically limited in scale, diversity, and annotation richness, particularly for real-world dynamic scenes with ground-truth camera motion. To this end, we collect **SpatialVID**, a dataset consists of a large corpus of in-the-wild videos with diverse scenes, camera movements and dense 3D annotations such as per-frame camera poses, depth, and motion instructions. Specifically, we collect more than **21,000 hours** of raw video, and process them into **2.7 million clips** clips through a hierarchical filtering pipeline, totaling **7,089 hours** of dynamic content. A subsequent annotation pipeline enriches these clips with detailed spatial and semantic information, including camera poses, depth maps, dynamic masks, structured captions, and serialized motion instructions. Analysis of SpatialVID's data statistics reveals a richness and diversity that directly foster improved model generalization and performance, establishing it as a key asset for the video and 3D vision research community.
 
 ## 🎉NEWS
 
-+ [2025.09.08] 🔥 Our paper, code and SpatialVid-HQ dataset are released!
++ [2025.09.11] 🔥 Our paper, code and SpatialVid-HQ dataset are released!
 
 ## Preparation
 
