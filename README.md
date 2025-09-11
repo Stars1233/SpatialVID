@@ -164,7 +164,7 @@ Thanks to the developers and contributors of the following open-source repositor
 - [SAM2](https://github.com/facebookresearch/sam2): A model towards solving promptable visual segmentation in images and videos.
 - [Viser](https://viser.studio/latest/): A library for interactive 3D visualization in Python.
 
-This project is licensed under CC-BY-NC-SA-4.0 License. However, if you use MegaSaM or other components in your work, please follow their license.
+Our repository is licensed under the Apache 2.0 License. However, if you use MegaSaM or other components in your work, please follow their license.
 
 ## Citation
 
