@@ -2,7 +2,7 @@
 <div align='center'>
     <a href='https://oiiiwjh.github.io/' target='_blank'>Jiahao Wang</a><sup>1*</sup> 
     <a href='https://github.com/FelixYuan-YF' target='_blank'>Yufeng Yuan</a><sup>1*</sup> 
-    <a href='https://github.com/zrj-cn' target='_blank'>Rujie Zheng</a><sup>1*</sup> 
+    <a href='https://zrj-cn.github.io/' target='_blank'>Rujie Zheng</a><sup>1*</sup> 
     <a href='https://linyou.github.io' target='_blank'>Youtian Lin</a><sup>1</sup> 
     <a href='https://ygaojiany.github.io' target='_blank'>Jian Gao</a><sup>1</sup> 
     <a href='https://linzhuo.xyz' target='_blank'>Lin-Zhuo Chen</a><sup>1</sup> 
