@@ -90,6 +90,7 @@ Significant progress has been made in spatial intelligence, spanning both spatia
 4. [Optional] Package needed for visualization
 
    ```bash
+   pip install plotly
    pip install -e viser
    ```
 
