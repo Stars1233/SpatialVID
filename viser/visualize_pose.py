@@ -1,14 +1,24 @@
+#!/usr/bin/env python3
+"""
+Camera Pose Visualization Module
+
+This module provides comprehensive tools for visualizing camera poses and trajectories
+in 3D space using Plotly. It supports both static and animated visualizations with
+automatic camera view optimization.
+"""
+
 import argparse
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import pickle as pkl
 import plotly.graph_objs as go
 import plotly.io as pio
 from tqdm import tqdm
-import pandas as pd
+import einops
+import torch
 
+# Use non-interactive backend for matplotlib to avoid display issues
 matplotlib.use("agg")
 
 
@@ -21,13 +31,6 @@ class Pose:
     def __call__(self, R=None, t=None):
         """
         Construct a camera pose from the given rotation matrix R and/or translation vector t.
-
-        Args:
-            R: Rotation matrix [...,3,3] or None
-            t: Translation vector [...,3] or None
-
-        Returns:
-            pose: Camera pose matrix [...,3,4]
         """
         assert R is not None or t is not None
         if R is None:
@@ -53,13 +56,6 @@ class Pose:
     def invert(self, pose, use_inverse=False):
         """
         Invert a camera pose.
-
-        Args:
-            pose: Camera pose matrix [...,3,4]
-            use_inverse: Whether to use matrix inverse instead of transpose
-
-        Returns:
-            pose_inv: Inverted camera pose matrix [...,3,4]
         """
         R, t = pose[..., :3], pose[..., 3:]
         R_inv = np.linalg.inv(R) if use_inverse else R.transpose(0, 2, 1)
@@ -71,12 +67,6 @@ class Pose:
         """
         Compose a sequence of poses together.
         pose_new(x) = poseN o ... o pose2 o pose1(x)
-
-        Args:
-            pose_list: List of camera poses to compose
-
-        Returns:
-            pose_new: Composed camera pose
         """
         pose_new = pose_list[0]
         for pose in pose_list[1:]:
@@ -86,14 +76,6 @@ class Pose:
     def compose_pair(self, pose_a, pose_b):
         """
         Compose two poses together.
-        pose_new(x) = pose_b o pose_a(x)
-
-        Args:
-            pose_a: First camera pose
-            pose_b: Second camera pose
-
-        Returns:
-            pose_new: Composed camera pose
         """
         R_a, t_a = pose_a[..., :3], pose_a[..., 3:]
         R_b, t_b = pose_b[..., :3], pose_b[..., 3:]
@@ -107,13 +89,6 @@ class Pose:
         Scale the camera center from the origin.
         0 = R@c+t --> c = -R^T@t (camera center in world coordinates)
         0 = R@(sc)+t' --> t' = -R@(sc) = -R@(-R^T@st) = st
-
-        Args:
-            pose: Camera pose to scale
-            scale: Scale factor
-
-        Returns:
-            pose_new: Scaled camera pose
         """
         R, t = pose[..., :3], pose[..., 3:]
         pose_new = np.concatenate([R, t * scale], axis=-1)
@@ -121,13 +96,17 @@ class Pose:
 
 
 def to_hom(X):
-    """Get homogeneous coordinates of the input by appending ones."""
+    """
+    Convert points to homogeneous coordinates by appending ones.
+    """
     X_hom = np.concatenate([X, np.ones_like(X[..., :1])], axis=-1)
     return X_hom
 
 
 def cam2world(X, pose):
-    """Transform points from camera to world coordinates."""
+    """
+    Transform points from camera coordinates to world coordinates.
+    """
     X_hom = to_hom(X)
     pose_inv = Pose().invert(pose)
     return X_hom @ pose_inv.transpose(0, 2, 1)
@@ -135,28 +114,27 @@ def cam2world(X, pose):
 
 def get_camera_mesh(pose, depth=1):
     """
-    Create a camera mesh visualization.
-
-    Args:
-        pose: Camera pose matrix
-        depth: Size of the camera frustum
-
-    Returns:
-        vertices: Camera mesh vertices
-        faces: Camera mesh faces
-        wireframe: Camera wireframe vertices
+    Create a 3D mesh representation of camera frustums for visualization.
     """
+    # Define camera frustum geometry: 4 corners of image plane + camera center
     vertices = (
         np.array(
             [[-0.5, -0.5, 1], [0.5, -0.5, 1], [0.5, 0.5, 1], [-0.5, 0.5, 1], [0, 0, 0]]
         )
         * depth
-    )  # [6,3]
+    )  # Shape: [5, 3] - 4 image plane corners + camera center
+
+    # Define triangular faces for the camera frustum mesh
     faces = np.array(
         [[0, 1, 2], [0, 2, 3], [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]]
-    )  # [6,3]
-    vertices = cam2world(vertices[None], pose)  # [N,6,3]
-    wireframe = vertices[:, [0, 1, 2, 3, 0, 4, 1, 2, 4, 3]]  # [N,10,3]
+    )  # Shape: [6, 3] - 6 triangular faces forming the pyramid
+
+    # Transform vertices from camera space to world space
+    vertices = cam2world(vertices[None], pose)  # Shape: [N, 5, 3]
+
+    # Create wireframe lines connecting: corners -> center -> next corner
+    wireframe = vertices[:, [0, 1, 2, 3, 0, 4, 1, 2, 4, 3]]  # Shape: [N, 10, 3]
+
     return vertices, faces, wireframe
 
 
@@ -178,22 +156,30 @@ def get_camera_mesh(pose, depth=1):
 
 
 def merge_wireframes_plotly(wireframe):
-    """Merge camera wireframes for plotly visualization."""
-    wf_dummy = wireframe[:, :1] * np.nan
+    """
+    Merge camera wireframes for efficient Plotly visualization.
+    """
+    wf_dummy = wireframe[:, :1] * np.nan  # Create NaN separators
     wireframe_merged = np.concatenate([wireframe, wf_dummy], axis=1).reshape(-1, 3)
     return wireframe_merged
 
 
 def merge_meshes(vertices, faces):
-    """Merge multiple camera meshes into a single mesh."""
+    """
+    Merge multiple camera meshes into a single mesh for efficient rendering.
+    """
     mesh_N, vertex_N = vertices.shape[:2]
+    # Adjust face indices for each mesh by adding vertex offset
     faces_merged = np.concatenate([faces + i * vertex_N for i in range(mesh_N)], axis=0)
+    # Flatten all vertices into single array
     vertices_merged = vertices.reshape(-1, vertices.shape[-1])
     return vertices_merged, faces_merged
 
 
 def unbind_np(array, axis=0):
-    """Split numpy array along specified axis into list."""
+    """
+    Split numpy array along specified axis into a list of arrays.
+    """
     if axis == 0:
         return [array[i, :] for i in range(array.shape[0])]
     elif axis == 1 or (len(array.shape) == 2 and axis == -1):
@@ -201,92 +187,84 @@ def unbind_np(array, axis=0):
     elif axis == 2 or (len(array.shape) == 3 and axis == -1):
         return [array[:, :, j] for j in range(array.shape[2])]
     else:
-        raise ValueError("Invalid axis. Use 0 for rows or 1 for columns.")
+        raise ValueError("Invalid axis. Use 0 for rows, 1 for columns, or 2 for depth.")
 
 
 def plotly_visualize_pose(
     poses, vis_depth=0.5, xyz_length=0.5, center_size=2, xyz_width=5, mesh_opacity=0.05
 ):
     """
-    Create plotly visualization traces for camera poses.
-
-    Args:
-        poses: Camera poses to visualize [N,3,4]
-        vis_depth: Size of camera frustum visualization
-        xyz_length: Length of coordinate axis indicators
-        center_size: Size of camera center markers
-        xyz_width: Width of coordinate axis lines
-        mesh_opacity: Opacity of camera frustum mesh
-
-    Returns:
-        plotly_traces: List of plotly visualization traces
+    Create comprehensive Plotly visualization traces for camera poses.
     """
     N = len(poses)
-    centers_cam = np.zeros([N, 1, 3])
-    centers_world = cam2world(centers_cam, poses)
-    centers_world = centers_world[:, 0]
-    # Get the camera wireframes.
+
+    # Calculate camera centers in world coordinates
+    centers_cam = np.zeros([N, 1, 3])  # Camera centers in camera space (origin)
+    centers_world = cam2world(centers_cam, poses)  # Transform to world space
+    centers_world = centers_world[:, 0]  # Remove extra dimension [N, 3]
+
+    # Generate camera frustum geometry
     vertices, faces, wireframe = get_camera_mesh(poses, depth=vis_depth)
-    # xyz = get_xyz_indicators(poses, length=xyz_length)
+
+    # Merge all camera meshes into single arrays for efficient rendering
     vertices_merged, faces_merged = merge_meshes(vertices, faces)
     wireframe_merged = merge_wireframes_plotly(wireframe)
-    # xyz_merged = merge_xyz_indicators_plotly(xyz)
-    # Break up (x,y,z) coordinates.
+
+    # Extract x, y, z coordinates for Plotly
     wireframe_x, wireframe_y, wireframe_z = unbind_np(wireframe_merged, axis=-1)
-    # xyz_x, xyz_y, xyz_z = unbind_np(xyz_merged, axis=-1)
     centers_x, centers_y, centers_z = unbind_np(centers_world, axis=-1)
     vertices_x, vertices_y, vertices_z = unbind_np(vertices_merged, axis=-1)
-    # Set the color map for the camera trajectory and the xyz indicators.
+
+    # Set up rainbow color mapping for trajectory progression
     color_map = plt.get_cmap("gist_rainbow")  # red -> yellow -> green -> blue -> purple
     center_color = []
     faces_merged_color = []
     wireframe_color = []
-    # xyz_color = []
-    # x_color, y_color, z_color = *np.eye(3).T,
 
-    # Determine the indices for the quarter positions
-    quarter_indices = set()
-    quarter_indices.add(0)
+    # Determine quarter positions for emphasis (start, 1/3, 2/3, end)
+    quarter_indices = set([0])  # Always include start
     if N >= 3:
         quarter_indices.add(N // 3)
         quarter_indices.add(2 * N // 3)
-    quarter_indices.add(N - 1)
+    quarter_indices.add(N - 1)  # Always include end
 
+    # Apply colors with emphasis on key trajectory points
     for i in range(N):
-        # Check if the current index is a quarter index
+        # Emphasize quarter positions with higher opacity and brightness
         is_quarter = i in quarter_indices
+        alpha = 6.0 if is_quarter else 0.4  # Higher opacity for key points
 
-        # For quarter positions, use dark color with high opacity
-        alpha = 6.0 if is_quarter else 0.4
-
-        # Add alpha channel (RGBA)
+        # Generate color from rainbow colormap
         r, g, b, _ = color_map(i / (N - 1))
-        rgb = np.array([r, g, b]) * 1.2 if is_quarter else np.array([r, g, b]) * 0.8
+        rgb = np.array([r, g, b]) * (1.2 if is_quarter else 0.8)  # Brighten key points
         rgba = np.concatenate([rgb, [alpha]])
-        wireframe_color += [rgba] * 11
-        center_color += [rgba]
-        faces_merged_color += [rgba] * 6
-        # xyz_color += [np.concatenate([x_color, [alpha]])] * 3 + \
-        #              [np.concatenate([y_color, [alpha]])] * 3 + \
-        #              [np.concatenate([z_color, [alpha]])] * 3
 
-    # Plot in plotly.
+        # Apply colors to all visualization elements
+        wireframe_color += [rgba] * 11  # 11 line segments per camera wireframe
+        center_color += [rgba]
+        faces_merged_color += [rgba] * 6  # 6 triangular faces per camera frustum
+
+    # Create Plotly trace objects
     plotly_traces = [
+        # Camera wireframe outlines
         go.Scatter3d(
             x=wireframe_x,
             y=wireframe_y,
             z=wireframe_z,
             mode="lines",
             line=dict(color=wireframe_color, width=1),
+            name="Camera Wireframes",
         ),
-        # go.Scatter3d(x=xyz_x, y=xyz_y, z=xyz_z, mode="lines", line=dict(color=xyz_color, width=xyz_width)),
+        # Camera center points
         go.Scatter3d(
             x=centers_x,
             y=centers_y,
             z=centers_z,
             mode="markers",
             marker=dict(color=center_color, size=center_size, opacity=1),
+            name="Camera Centers",
         ),
+        # Camera frustum mesh faces
         go.Mesh3d(
             x=vertices_x,
             y=vertices_y,
@@ -296,6 +274,7 @@ def plotly_visualize_pose(
             k=[f[2] for f in faces_merged],
             facecolor=faces_merged_color,
             opacity=mesh_opacity,
+            name="Camera Frustums",
         ),
     ]
     return plotly_traces
@@ -303,254 +282,263 @@ def plotly_visualize_pose(
 
 def compute_optimal_camera_view(poses):
     """
-    计算最优的相机视角，确保整个轨迹都在视野内且视角美观
-    
-    Args:
-        poses: Camera poses [N,3,4]
-        
-    Returns:
-        dict: 包含camera参数、vis_depth等的字典
+    Compute optimal camera view parameters to ensure the entire trajectory is visible
+    and aesthetically pleasing.
     """
-    # 计算所有相机位置
+    # Calculate all camera positions in world coordinates
     centers_cam = np.zeros([len(poses), 1, 3])
     centers_world = cam2world(centers_cam, poses)[:, 0]
-    
-    # 计算轨迹的包围盒
+
+    # Compute bounding box of the trajectory
     min_coords = np.min(centers_world, axis=0)
     max_coords = np.max(centers_world, axis=0)
     ranges = max_coords - min_coords
-    
-    # 计算轨迹中心
+
+    # Calculate trajectory center point
     trajectory_center = (min_coords + max_coords) / 2
-    
-    # 计算最大范围，用于自适应缩放
+
+    # Calculate maximum range for adaptive scaling
     max_range = np.max(ranges)
-    
-    # 如果轨迹太小，设置最小范围避免除零
+
+    # Set minimum range to avoid division by zero for very small trajectories
     if max_range < 1e-6:
         max_range = 1.0
         ranges = np.ones(3)
-    
-    # 计算轨迹的主方向（使用PCA）
+
+    # Calculate principal direction of trajectory using PCA (Principal Component Analysis)
     if len(centers_world) > 1:
-        # 去中心化
+        # Center the points by subtracting the mean
         centered_points = centers_world - trajectory_center
-        
-        # 计算协方差矩阵
+
+        # Compute covariance matrix for PCA
         cov_matrix = np.cov(centered_points.T)
-        
-        # 计算特征值和特征向量
+
+        # Calculate eigenvalues and eigenvectors
         eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
-        
-        # 按特征值排序（降序）
+
+        # Sort by eigenvalues in descending order
         idx = np.argsort(eigenvalues)[::-1]
         eigenvalues = eigenvalues[idx]
         eigenvectors = eigenvectors[:, idx]
-        
-        # 主方向是第一个特征向量
+
+        # Main direction is the first eigenvector (highest variance)
         main_direction = eigenvectors[:, 0]
-        
-        # 确保主方向指向轨迹的正方向
+
+        # Ensure main direction points towards trajectory's positive direction
         start_to_end = centers_world[-1] - centers_world[0]
         if np.dot(main_direction, start_to_end) < 0:
             main_direction = -main_direction
-            
+
     else:
+        # Default direction for single pose or insufficient data
         main_direction = np.array([1, 0, 0])
-    
-    # 计算最优相机距离
-    # 基于轨迹范围和视野角度计算，使用更小的因子让轨迹更好填充画面
-    fov_factor = 0.8  # 进一步减小视野因子，让轨迹占据更多画面空间
+
+    # Calculate optimal camera distance
+    # Based on trajectory range and field of view, using smaller factor for better screen filling
+    fov_factor = (
+        0.8  # Reduced field of view factor to make trajectory occupy more screen space
+    )
     base_distance = max_range * fov_factor
-    
-    # 考虑轨迹的纵横比，调整距离
+
+    # Consider trajectory aspect ratio and adjust distance accordingly
     aspect_ratios = ranges / max_range
-    distance_scale = 1.0 + 0.1 * np.std(aspect_ratios)  # 进一步减小距离调整幅度
+    distance_scale = 1.0 + 0.1 * np.std(
+        aspect_ratios
+    )  # Reduced distance adjustment magnitude
     camera_distance = base_distance * distance_scale
-    
-    # 计算最优相机位置
-    # 方法1：基于主方向的斜视角度
-    up_vector = np.array([0, 0, 1])
-    
-    # 如果主方向接近垂直，调整策略
+
+    # Calculate optimal camera position
+    # Method 1: Diagonal viewing angle based on main direction
+    up_vector = np.array([0, 0, 1])  # World up direction (Z-axis)
+
+    # Adjust strategy if main direction is nearly vertical
     if abs(np.dot(main_direction, up_vector)) > 0.9:
-        # 主方向接近垂直，使用侧视角
+        # Main direction is nearly vertical, use side view
         view_direction = np.cross(main_direction, np.array([1, 0, 0]))
         if np.linalg.norm(view_direction) < 0.1:
             view_direction = np.cross(main_direction, np.array([0, 1, 0]))
         view_direction = view_direction / np.linalg.norm(view_direction)
     else:
-        # 计算垂直于主方向且倾斜的视角方向
-        # 结合主方向的垂直分量和一个倾斜角度
-        horizontal_component = main_direction - np.dot(main_direction, up_vector) * up_vector
-        horizontal_component = horizontal_component / (np.linalg.norm(horizontal_component) + 1e-8)
-        
-        # 添加一些倾斜角度以获得更好的3D视角
-        elevation_angle = np.pi / 6  # 30度仰角
-        azimuth_offset = np.pi / 4   # 45度方位角偏移
-        
-        # 创建倾斜的视角方向
-        view_direction = (
-            horizontal_component * np.cos(azimuth_offset) * np.cos(elevation_angle) +
-            np.cross(horizontal_component, up_vector) * np.sin(azimuth_offset) * np.cos(elevation_angle) +
-            up_vector * np.sin(elevation_angle)
+        # Calculate diagonal view direction perpendicular to main direction
+        # Combine horizontal component of main direction with tilt angle
+        horizontal_component = (
+            main_direction - np.dot(main_direction, up_vector) * up_vector
         )
-    
-    # 计算相机eye位置
+        horizontal_component = horizontal_component / (
+            np.linalg.norm(horizontal_component) + 1e-8
+        )
+
+        # Add some tilt angles for better 3D perspective
+        elevation_angle = np.pi / 6  # 30 degrees elevation angle
+        azimuth_offset = np.pi / 4  # 45 degrees azimuth offset
+
+        # Create tilted view direction for optimal 3D perspective
+        view_direction = (
+            horizontal_component * np.cos(azimuth_offset) * np.cos(elevation_angle)
+            + np.cross(horizontal_component, up_vector)
+            * np.sin(azimuth_offset)
+            * np.cos(elevation_angle)
+            + up_vector * np.sin(elevation_angle)
+        )
+
+    # Calculate camera eye position
     camera_eye = trajectory_center + view_direction * camera_distance
-    
-    # 微调相机位置，确保轨迹完全在视野内
-    # 计算从相机位置到轨迹各点的向量
+
+    # Fine-tune camera position to ensure entire trajectory is within view
+    # Calculate vectors from camera position to all trajectory points
     view_vectors = centers_world - camera_eye
     view_distances = np.linalg.norm(view_vectors, axis=1)
-    
-    # 如果有些点太近，适度调整相机距离
-    min_distance = camera_distance * 0.3  # 降低最小距离比例
+
+    # Adjust camera distance moderately if some points are too close
+    min_distance = camera_distance * 0.3  # Reduced minimum distance ratio
     if np.min(view_distances) < min_distance:
         distance_adjustment = min_distance / np.min(view_distances)
-        # 限制调整幅度，避免过度放大
-        distance_adjustment = min(distance_adjustment, 1.2)  # 进一步限制调整幅度
-        camera_eye = trajectory_center + view_direction * camera_distance * distance_adjustment
-    
-    # 计算自适应参数，使用更合适的比例
-    auto_vis_depth = max_range * 0.08  # 适当减小相机锥体大小
-    auto_center_size = max_range * 1.5  # 适当减小中心点大小
-    
-    # 确保参数在合理范围内
+        # Limit adjustment magnitude to avoid excessive scaling
+        distance_adjustment = min(
+            distance_adjustment, 1.2
+        )  # Further limit adjustment range
+        camera_eye = (
+            trajectory_center + view_direction * camera_distance * distance_adjustment
+        )
+
+    # Calculate adaptive parameters with appropriate proportions
+    auto_vis_depth = max_range * 0.08  # Moderately reduced camera frustum size
+    auto_center_size = max_range * 1.5  # Moderately reduced center point size
+
+    # Ensure parameters are within reasonable bounds
     auto_vis_depth = max(0.01, min(auto_vis_depth, max_range * 0.2))
     auto_center_size = max(0.1, min(auto_center_size, max_range * 2.0))
-    
+
     return {
-        'camera_eye': camera_eye,
-        'trajectory_center': trajectory_center,
-        'auto_vis_depth': auto_vis_depth,
-        'auto_center_size': auto_center_size,
-        'max_range': max_range,
-        'ranges': ranges,
-        'main_direction': main_direction
+        "camera_eye": camera_eye,
+        "trajectory_center": trajectory_center,
+        "auto_vis_depth": auto_vis_depth,
+        "auto_center_size": auto_center_size,
+        "max_range": max_range,
+        "ranges": ranges,
+        "main_direction": main_direction,
     }
 
 
 def compute_multiple_camera_views(poses):
     """
-    计算多个优化的相机视角，提供不同的观察选项
-    
-    Args:
-        poses: Camera poses [N,3,4]
-        
-    Returns:
-        dict: 包含多个视角选项的字典
+    Compute multiple optimized camera view angles, providing different viewing options.
     """
     base_params = compute_optimal_camera_view(poses)
-    
-    trajectory_center = base_params['trajectory_center']
-    max_range = base_params['max_range']
-    main_direction = base_params['main_direction']
-    
-    # 计算多个视角选项
+
+    trajectory_center = base_params["trajectory_center"]
+    max_range = base_params["max_range"]
+    main_direction = base_params["main_direction"]
+
+    # Calculate multiple view options
     views = {}
-    
-    # 1. 最佳自动视角（原有的）
-    views['optimal'] = base_params
-    
-    # 2. 正上方俯视视角
-    top_distance = max_range * 1.5  # 进一步减小俯视距离
-    views['top'] = {
+
+    # 1. Best automatic view (original optimal view)
+    views["optimal"] = base_params
+
+    # 2. Top-down bird's eye view
+    top_distance = max_range * 1.5  # Further reduced top-down view distance
+    views["top"] = {
         **base_params,
-        'camera_eye': trajectory_center + np.array([0, 0, top_distance]),
-        'description': 'Top-down view'
+        "camera_eye": trajectory_center + np.array([0, 0, top_distance]),
+        "description": "Top-down view",
     }
-    
-    # 3. 侧视视角
-    side_distance = max_range * 1.3  # 进一步减小侧视距离
+
+    # 3. Side view perspective
+    side_distance = max_range * 1.3  # Further reduced side view distance
     side_direction = np.cross(main_direction, np.array([0, 0, 1]))
     if np.linalg.norm(side_direction) < 0.1:
         side_direction = np.array([1, 0, 0])
     else:
         side_direction = side_direction / np.linalg.norm(side_direction)
-    
-    views['side'] = {
+
+    views["side"] = {
         **base_params,
-        'camera_eye': trajectory_center + side_direction * side_distance,
-        'description': 'Side view'
+        "camera_eye": trajectory_center + side_direction * side_distance,
+        "description": "Side view",
     }
-    
-    # 4. 对角线视角（45度仰角）
-    diagonal_distance = max_range * 1.4  # 进一步减小对角视角距离
-    elevation = np.pi / 4  # 45度
-    azimuth = np.pi / 4    # 45度方位角
-    
-    diagonal_direction = np.array([
-        np.cos(elevation) * np.cos(azimuth),
-        np.cos(elevation) * np.sin(azimuth),
-        np.sin(elevation)
-    ])
-    
-    views['diagonal'] = {
+
+    # 4. Diagonal view (45-degree elevation)
+    diagonal_distance = max_range * 1.4  # Further reduced diagonal view distance
+    elevation = np.pi / 4  # 45 degrees elevation
+    azimuth = np.pi / 4  # 45 degrees azimuth angle
+
+    diagonal_direction = np.array(
+        [
+            np.cos(elevation) * np.cos(azimuth),
+            np.cos(elevation) * np.sin(azimuth),
+            np.sin(elevation),
+        ]
+    )
+
+    views["diagonal"] = {
         **base_params,
-        'camera_eye': trajectory_center + diagonal_direction * diagonal_distance,
-        'description': 'Diagonal view (45° elevation)'
+        "camera_eye": trajectory_center + diagonal_direction * diagonal_distance,
+        "description": "Diagonal view (45° elevation)",
     }
-    
-    # 5. 轨迹起点视角
+
+    # 5. Trajectory start-oriented view
     if len(poses) > 1:
-        start_to_center = trajectory_center - base_params['camera_eye']  
-        start_distance = max_range * 1.2  # 进一步减小起点视角距离
+        start_to_center = trajectory_center - base_params["camera_eye"]
+        start_distance = max_range * 1.2  # Further reduced start view distance
         start_direction = start_to_center / (np.linalg.norm(start_to_center) + 1e-8)
-        
-        views['trajectory_start'] = {
+
+        views["trajectory_start"] = {
             **base_params,
-            'camera_eye': trajectory_center + start_direction * start_distance,
-            'description': 'View from trajectory start direction'
+            "camera_eye": trajectory_center + start_direction * start_distance,
+            "description": "View from trajectory start direction",
         }
-    
-    # 6. 紧凑视角 - 确保整个轨迹完全可见
-    fit_distance = max_range * 0.6  # 非常紧凑的距离
-    fit_direction = np.array([0.7, 0.7, 0.5])  # 稳定的视角方向
+
+    # 6. Compact view - ensure entire trajectory is fully visible
+    fit_distance = max_range * 0.6  # Very compact distance for close-up view
+    fit_direction = np.array([0.7, 0.7, 0.5])  # Stable viewing direction
     fit_direction = fit_direction / np.linalg.norm(fit_direction)
-    
-    views['fit_all'] = {
+
+    views["fit_all"] = {
         **base_params,
-        'camera_eye': trajectory_center + fit_direction * fit_distance,
-        'description': 'Fit all trajectory in view'
+        "camera_eye": trajectory_center + fit_direction * fit_distance,
+        "description": "Fit all trajectory in view",
     }
-    
+
     return views
 
 
 def add_view_selector_to_html(html_str, views):
     """
-    在HTML中添加视角选择器
-    
+    Add interactive view selector to HTML visualization.
+
+    This function injects JavaScript code into the HTML to provide an interactive
+    interface for switching between different camera views and enabling auto-rotation.
+
     Args:
-        html_str: 原始HTML字符串
-        views: 视角字典
-        
+        html_str: Original HTML string containing the Plotly visualization
+        views: Dictionary of view configurations
+
     Returns:
-        str: 添加了视角选择器的HTML字符串
+        str: Enhanced HTML string with view selector and controls
     """
-    
-    # 生成视角选择器的JavaScript代码
+
+    # Generate JavaScript code for view selector
     view_selector_js = """
     <div id="view-selector" style="position: fixed; top: 10px; left: 10px; background: rgba(255,255,255,0.9); padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); font-family: Arial, sans-serif; font-size: 12px; z-index: 1000; min-width: 120px;">
         <button onclick="autoRotate()" style="background: #ffc107; color: black; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; width: 100%;">Auto Rotate</button>
     </div>
     
     <script>
-    // 预定义的视角配置
+    // Pre-defined view configurations
     const views = {"""
-    
-    # 添加视角数据
+
+    # Add view data to JavaScript
     for view_name, view_data in views.items():
-        eye = view_data['camera_eye']
-        center = view_data['trajectory_center']
+        eye = view_data["camera_eye"]
+        center = view_data["trajectory_center"]
         view_selector_js += f"""
         {view_name}: {{
             eye: {{x: {eye[0]:.6f}, y: {eye[1]:.6f}, z: {eye[2]:.6f}}},
             center: {{x: {center[0]:.6f}, y: {center[1]:.6f}, z: {center[2]:.6f}}},
             up: {{x: 0, y: 0, z: 1}}
         }},"""
-    
+
     view_selector_js += """
     };
     
@@ -576,7 +564,7 @@ def add_view_selector_to_html(html_str, views):
         
         var angle = 0;
         rotationInterval = setInterval(function() {
-            angle += 0.02; // 旋转速度
+            angle += 0.02; // Rotation speed
             
             var newEye = {
                 x: center.x + radius * Math.cos(angle) * 0.7,
@@ -592,10 +580,10 @@ def add_view_selector_to_html(html_str, views):
         }, 50);
     }
     
-    // 在页面加载完成后设置默认视角
+    // Set default view after page loading is complete
     document.addEventListener('DOMContentLoaded', function() {
         setTimeout(function() {
-            // 使用 Fit All 作为默认视角，无需按钮操作
+            // Use Fit All as default view, no button operation required
             var plotlyDiv = document.querySelector('.plotly-graph-div');
             if (plotlyDiv && views.fit_all) {
                 var update = {
@@ -607,77 +595,89 @@ def add_view_selector_to_html(html_str, views):
     });
     </script>
     """
-    
-    # 将视角选择器添加到HTML开头
+
+    # Add view selector to the beginning of HTML
     return view_selector_js + html_str
 
 
 def write_html(poses, file, vis_depth=1, xyz_length=0.2, center_size=0.01, xyz_width=2):
-    """Write camera pose visualization to HTML file with optimized camera view."""
-    # 计算基础的最优视角
+    """
+    Write camera pose visualization to HTML file with optimized camera view.
+    """
+    # Calculate basic optimal view parameters
     base_view = compute_optimal_camera_view(poses)
-    
-    # 获取轨迹信息
-    trajectory_center = base_view['trajectory_center']
-    max_range = base_view['max_range']
-    ranges = base_view['ranges']
-    auto_vis_depth = base_view['auto_vis_depth']
-    auto_center_size = base_view['auto_center_size']
-    
-    # 计算能看到整个轨迹的最佳视角
-    # 使用更大的距离确保整个轨迹可见，并选择更好的角度
-    optimal_distance = max_range * 1.8 * 10  # 增大10倍距离以获得更好的整体视角
-    
-    # 选择一个能看到轨迹全貌的理想角度
-    # 使用45度仰角和45度方位角的组合，这通常能提供很好的3D视角
-    elevation = np.pi / 4  # 45度仰角
-    azimuth = np.pi / 4    # 45度方位角
-    
-    # 计算最佳观察方向
-    optimal_direction = np.array([
-        np.cos(elevation) * np.cos(azimuth),
-        np.cos(elevation) * np.sin(azimuth),
-        np.sin(elevation)
-    ])
-    
-    # 计算最佳相机位置
+
+    # Extract trajectory information
+    trajectory_center = base_view["trajectory_center"]
+    max_range = base_view["max_range"]
+    ranges = base_view["ranges"]
+    auto_vis_depth = base_view["auto_vis_depth"]
+    auto_center_size = base_view["auto_center_size"]
+
+    # Calculate optimal view to see entire trajectory
+    # Use larger distance to ensure entire trajectory is visible with better angles
+    optimal_distance = (
+        max_range * 1.8 * 10
+    )  # Increase distance by 10x for better overall view
+
+    # Choose ideal angle that can see the full trajectory
+    # Use combination of 45-degree elevation and azimuth for good 3D perspective
+    elevation = np.pi / 4  # 45-degree elevation angle
+    azimuth = np.pi / 4  # 45-degree azimuth angle
+
+    # Calculate optimal viewing direction
+    optimal_direction = np.array(
+        [
+            np.cos(elevation) * np.cos(azimuth),
+            np.cos(elevation) * np.sin(azimuth),
+            np.sin(elevation),
+        ]
+    )
+
+    # Calculate optimal camera position
     camera_eye = trajectory_center + optimal_direction * optimal_distance
-    
-    # 验证视野覆盖 - 确保所有轨迹点都在合理距离内
+
+    # Verify view coverage - ensure all trajectory points are within reasonable distance
     centers_cam = np.zeros([len(poses), 1, 3])
     centers_world = cam2world(centers_cam, poses)[:, 0]
-    
-    # 计算从最佳相机位置到所有轨迹点的距离
+
+    # Calculate distances from optimal camera position to all trajectory points
     distances_to_points = np.linalg.norm(centers_world - camera_eye, axis=1)
     max_distance_to_point = np.max(distances_to_points)
     min_distance_to_point = np.min(distances_to_points)
-    
-    # 如果距离差异过大，说明视角可能不够理想，进行调整
+
+    # If distance variation is too large, the view might not be ideal, adjust accordingly
     if max_distance_to_point / min_distance_to_point > 3.0:
-        # 重新计算更平衡的距离
-        optimal_distance = max_range * 2.2 * 10  # 进一步增大距离（10倍）
+        # Recalculate more balanced distance
+        optimal_distance = max_range * 2.2 * 10  # Further increase distance (10x)
         camera_eye = trajectory_center + optimal_direction * optimal_distance
-    
-    # 创建视角字典，只包含最佳视角用于Auto Rotate
+
+    # Create view dictionary with only optimal view for Auto Rotate
     views = {
-        'fit_all': {
-            'camera_eye': camera_eye,
-            'trajectory_center': trajectory_center,
-            'auto_vis_depth': auto_vis_depth,
-            'auto_center_size': auto_center_size,
-            'max_range': max_range,
-            'ranges': ranges,
-            'description': 'Optimal view to see entire trajectory'
+        "fit_all": {
+            "camera_eye": camera_eye,
+            "trajectory_center": trajectory_center,
+            "auto_vis_depth": auto_vis_depth,
+            "auto_center_size": auto_center_size,
+            "max_range": max_range,
+            "ranges": ranges,
+            "description": "Optimal view to see entire trajectory",
         }
     }
-    
+
     print(f"Trajectory ranges: x={ranges[0]:.3f}, y={ranges[1]:.3f}, z={ranges[2]:.3f}")
     print(f"Max range: {max_range:.3f}")
     print(f"Auto vis_depth: {auto_vis_depth:.3f}, center_size: {auto_center_size:.3f}")
-    print(f"Trajectory center: ({trajectory_center[0]:.3f}, {trajectory_center[1]:.3f}, {trajectory_center[2]:.3f})")
-    print(f"Optimal camera position for full trajectory view: ({camera_eye[0]:.3f}, {camera_eye[1]:.3f}, {camera_eye[2]:.3f})")
+    print(
+        f"Trajectory center: ({trajectory_center[0]:.3f}, {trajectory_center[1]:.3f}, {trajectory_center[2]:.3f})"
+    )
+    print(
+        f"Optimal camera position for full trajectory view: ({camera_eye[0]:.3f}, {camera_eye[1]:.3f}, {camera_eye[2]:.3f})"
+    )
     print(f"Camera distance from trajectory center: {optimal_distance:.3f}")
-    print(f"Distance range to trajectory points: {min_distance_to_point:.3f} - {max_distance_to_point:.3f}")
+    print(
+        f"Distance range to trajectory points: {min_distance_to_point:.3f} - {max_distance_to_point:.3f}"
+    )
 
     xyz_length = xyz_length / 3
     xyz_width = xyz_width
@@ -704,7 +704,11 @@ def write_html(poses, file, vis_depth=1, xyz_length=0.2, center_size=0.01, xyz_w
             # Set initial camera view to fully see the trajectory with optimized positioning
             camera=dict(
                 eye=dict(x=camera_eye[0], y=camera_eye[1], z=camera_eye[2]),
-                center=dict(x=trajectory_center[0], y=trajectory_center[1], z=trajectory_center[2]),
+                center=dict(
+                    x=trajectory_center[0],
+                    y=trajectory_center[1],
+                    z=trajectory_center[2],
+                ),
                 up=dict(x=0, y=0, z=1),
             ),
         ),
@@ -823,13 +827,13 @@ def write_html(poses, file, vis_depth=1, xyz_length=0.2, center_size=0.01, xyz_w
     </script>
     """
 
-    # 添加视角选择器和相机信息到HTML
+    # Add view selector and camera info to HTML
     enhanced_html = add_view_selector_to_html(camera_info_html + html_str2, views)
-    
+
     file.write(enhanced_html)
 
     print(f"Enhanced visualized poses are saved to {file.name}")
-    # 移除了多余的视角选项打印
+    # Removed redundant view options printing
 
 
 def plotly_visualize_pose_animated(
@@ -843,18 +847,6 @@ def plotly_visualize_pose_animated(
     """
     Create plotly visualization traces for camera poses, frame by frame for animation.
     Now shows the full trajectory with future poses as completely transparent.
-
-    Args:
-        poses_full: All camera poses to visualize [N,3,4]
-        vis_depth: Size of camera frustum visualization
-        xyz_length: Length of coordinate axis indicators
-        center_size: Size of camera center markers
-        xyz_width: Width of coordinate axis lines
-        mesh_opacity: Opacity of camera frustum mesh
-
-    Returns:
-        plotly_data: Initial plotly traces for the first frame
-        plotly_frames: List of plotly frames for animation
     """
     N_total = len(poses_full)
     plotly_frames = []
@@ -877,35 +869,35 @@ def plotly_visualize_pose_animated(
 
     for i in tqdm(range(1, N_total + 1), desc="Generating animation frames"):
         current_frame = i - 1  # Current frame index (0-based)
-        
+
         # Set the color map for the camera trajectory
         color_map = plt.get_cmap("gist_rainbow")
         center_color = []
         faces_merged_color = []
         wireframe_color = []
-        
+
         for k in range(N_total):  # Process all poses
             # Set the camera pose colors (with a smooth gradient color map).
             r, g, b, _ = color_map(k / (N_total - 1))
             rgb = np.array([r, g, b]) * 0.8
-            
+
             # Set transparency based on current frame
             if k < current_frame:  # Past poses - visible with reduced opacity
-                # 根据时间距离设置透明度，越远越透明
+                # Set transparency based on temporal distance, more distant = more transparent
                 time_distance = (current_frame - k) / max(current_frame, 1)
-                alpha = 0.15 + 0.25 * (1 - time_distance)  # 0.15-0.4的透明度范围
+                alpha = 0.15 + 0.25 * (1 - time_distance)  # Transparency range 0.15-0.4
                 wireframe_alpha = alpha
                 mesh_alpha = alpha * 0.4
             elif k == current_frame:  # Current pose - fully visible
-                alpha = 0.8  # 完全不透明，深色显示
+                alpha = 0.8  # Fully opaque, dark display
                 wireframe_alpha = 0.8
                 mesh_alpha = 0.6
             else:  # Future poses - completely transparent
-                alpha = 0.0  # 完全透明
+                alpha = 0.0  # Completely transparent
                 wireframe_alpha = 0.0
                 mesh_alpha = 0.0
-            
-            # 设置颜色和透明度
+
+            # Set colors and transparency
             wireframe_color += [np.concatenate([rgb, [wireframe_alpha]])] * 11
             center_color += [np.concatenate([rgb, [alpha]])]
             faces_merged_color += [np.concatenate([rgb, [mesh_alpha]])] * 6
@@ -933,10 +925,10 @@ def plotly_visualize_pose_animated(
                 j=[f[1] for f in faces_merged],
                 k=[f[2] for f in faces_merged],
                 facecolor=faces_merged_color,
-                opacity=0.6,  # 为mesh设置基础不透明度
+                opacity=0.6,  # Set base opacity for mesh
             ),
         ]
-        
+
         if i == 1:  # Set initial data for the first frame
             initial_data = frame_data
 
@@ -948,64 +940,80 @@ def plotly_visualize_pose_animated(
 def write_html_animated(
     poses, file, vis_depth=1, xyz_length=0.2, center_size=0.01, xyz_width=2
 ):
-    """Write camera pose visualization with animation to HTML file with optimized camera view."""
-    # 计算基础的最优视角
+    """
+    Write camera pose visualization with animation to HTML file with optimized camera view.
+    """
+    # Calculate basic optimal view parameters
     base_view = compute_optimal_camera_view(poses)
-    
-    # 获取轨迹信息
-    trajectory_center = base_view['trajectory_center']
-    max_range = base_view['max_range']
-    ranges = base_view['ranges']
-    auto_vis_depth = base_view['auto_vis_depth']
-    auto_center_size = base_view['auto_center_size']
-    
-    # 计算能看到整个轨迹的最佳视角
-    # 使用更大的距离确保整个轨迹可见，并选择更好的角度
-    optimal_distance = max_range * 1.8 * 10  # 增大10倍距离以获得更好的整体视角
-    
-    # 选择一个能看到轨迹全貌的理想角度
-    # 使用45度仰角和45度方位角的组合，这通常能提供很好的3D视角
-    elevation = np.pi / 4  # 45度仰角
-    azimuth = np.pi / 4    # 45度方位角
-    
-    # 计算最佳观察方向
-    optimal_direction = np.array([
-        np.cos(elevation) * np.cos(azimuth),
-        np.cos(elevation) * np.sin(azimuth),
-        np.sin(elevation)
-    ])
-    
-    # 计算最佳相机位置
+
+    # Extract trajectory information
+    trajectory_center = base_view["trajectory_center"]
+    max_range = base_view["max_range"]
+    ranges = base_view["ranges"]
+    auto_vis_depth = base_view["auto_vis_depth"]
+    auto_center_size = base_view["auto_center_size"]
+
+    # Calculate optimal view to see entire trajectory
+    # Use larger distance to ensure entire trajectory is visible with better angles
+    optimal_distance = (
+        max_range * 1.8 * 10
+    )  # Increase distance by 10x for better overall view
+
+    # Choose ideal angle that can see the full trajectory
+    # Use combination of 45-degree elevation and azimuth for good 3D perspective
+    elevation = np.pi / 4  # 45-degree elevation angle
+    azimuth = np.pi / 4  # 45-degree azimuth angle
+
+    # Calculate optimal viewing direction
+    optimal_direction = np.array(
+        [
+            np.cos(elevation) * np.cos(azimuth),
+            np.cos(elevation) * np.sin(azimuth),
+            np.sin(elevation),
+        ]
+    )
+
+    # Calculate optimal camera position
     camera_eye = trajectory_center + optimal_direction * optimal_distance
-    
-    # 验证视野覆盖 - 确保所有轨迹点都在合理距离内
+
+    # Verify view coverage - ensure all trajectory points are within reasonable distance
     centers_cam = np.zeros([len(poses), 1, 3])
     centers_world = cam2world(centers_cam, poses)[:, 0]
-    
-    # 计算从最佳相机位置到所有轨迹点的距离
+
+    # Calculate distances from optimal camera position to all trajectory points
     distances_to_points = np.linalg.norm(centers_world - camera_eye, axis=1)
     max_distance_to_point = np.max(distances_to_points)
     min_distance_to_point = np.min(distances_to_points)
-    
-    # 如果距离差异过大，说明视角可能不够理想，进行调整
+
+    # If distance variation is too large, the view might not be ideal, adjust accordingly
     if max_distance_to_point / min_distance_to_point > 3.0:
-        # 重新计算更平衡的距离
-        optimal_distance = max_range * 2.2 * 10  # 进一步增大距离（10倍）
+        # Recalculate more balanced distance
+        optimal_distance = max_range * 2.2 * 10  # Further increase distance (10x)
         camera_eye = trajectory_center + optimal_direction * optimal_distance
-    
-    # 调整参数以适应动画
+
+    # Adjust parameters for animation
     xyz_length = xyz_length / 3
     xyz_width = xyz_width
-    vis_depth = auto_vis_depth  # 使用自动计算的深度
-    center_size = auto_center_size  # 使用自动计算的大小
+    vis_depth = auto_vis_depth  # Use automatically computed depth
+    center_size = auto_center_size  # Use automatically computed size
 
-    print(f"Animation - Trajectory ranges: x={ranges[0]:.3f}, y={ranges[1]:.3f}, z={ranges[2]:.3f}")
+    print(
+        f"Animation - Trajectory ranges: x={ranges[0]:.3f}, y={ranges[1]:.3f}, z={ranges[2]:.3f}"
+    )
     print(f"Animation - Max range: {max_range:.3f}")
-    print(f"Animation - Auto vis_depth: {auto_vis_depth:.3f}, center_size: {auto_center_size:.3f}")
-    print(f"Animation - Trajectory center: ({trajectory_center[0]:.3f}, {trajectory_center[1]:.3f}, {trajectory_center[2]:.3f})")
-    print(f"Animation - Optimal camera position for full trajectory view: ({camera_eye[0]:.3f}, {camera_eye[1]:.3f}, {camera_eye[2]:.3f})")
+    print(
+        f"Animation - Auto vis_depth: {auto_vis_depth:.3f}, center_size: {auto_center_size:.3f}"
+    )
+    print(
+        f"Animation - Trajectory center: ({trajectory_center[0]:.3f}, {trajectory_center[1]:.3f}, {trajectory_center[2]:.3f})"
+    )
+    print(
+        f"Animation - Optimal camera position for full trajectory view: ({camera_eye[0]:.3f}, {camera_eye[1]:.3f}, {camera_eye[2]:.3f})"
+    )
     print(f"Animation - Camera distance from trajectory center: {optimal_distance:.3f}")
-    print(f"Animation - Distance range to trajectory points: {min_distance_to_point:.3f} - {max_distance_to_point:.3f}")
+    print(
+        f"Animation - Distance range to trajectory points: {min_distance_to_point:.3f} - {max_distance_to_point:.3f}"
+    )
 
     initial_data, plotly_frames = plotly_visualize_pose_animated(
         poses,
@@ -1024,15 +1032,19 @@ def write_html_animated(
             dragmode="orbit",
             aspectratio=dict(x=1, y=1, z=1),
             aspectmode="data",
-            # 使用优化的相机视角设置（与write_html相同的10倍距离）
+            # Use optimized camera view settings (same 10x distance as write_html)
             camera=dict(
                 eye=dict(x=camera_eye[0], y=camera_eye[1], z=camera_eye[2]),
-                center=dict(x=trajectory_center[0], y=trajectory_center[1], z=trajectory_center[2]),
+                center=dict(
+                    x=trajectory_center[0],
+                    y=trajectory_center[1],
+                    z=trajectory_center[2],
+                ),
                 up=dict(x=0, y=0, z=1),
             ),
         ),
-        height=800,  # 增加高度以更好地显示动画
-        width=1200,  # 增加宽度以更好地显示动画
+        height=800,  # Increased height for better animation display
+        width=1200,  # Increased width for better animation display
         showlegend=False,
         updatemenus=[
             dict(
@@ -1062,74 +1074,87 @@ def write_html_animated(
     print(f"Visualized poses are saved to {file}")
 
 
-import einops
-import torch
-
-
 def quaternion_to_matrix(quaternions, eps: float = 1e-8):
     """
-    Convert the 4-dimensional quaternions to 3x3 rotation matrices.
-    This is adapted from Pytorch3D:
-    https://github.com/facebookresearch/pytorch3d/blob/main/pytorch3d/transforms/rotation_conversions.py
+    Convert 4-dimensional quaternions to 3x3 rotation matrices.
+
+    Reference:
+        https://github.com/facebookresearch/pytorch3d/blob/main/pytorch3d/transforms/rotation_conversions.py
     """
 
-    # Order changed to match scipy format!
+    # Order changed to match scipy format: (i, j, k, r)
     i, j, k, r = torch.unbind(quaternions, dim=-1)
     two_s = 2 / ((quaternions * quaternions).sum(dim=-1) + eps)
 
+    # Construct rotation matrix elements using quaternion algebra
     o = torch.stack(
         (
-            1 - two_s * (j * j + k * k),
-            two_s * (i * j - k * r),
-            two_s * (i * k + j * r),
-            two_s * (i * j + k * r),
-            1 - two_s * (i * i + k * k),
-            two_s * (j * k - i * r),
-            two_s * (i * k - j * r),
-            two_s * (j * k + i * r),
-            1 - two_s * (i * i + j * j),
+            1 - two_s * (j * j + k * k),  # R[0,0]
+            two_s * (i * j - k * r),  # R[0,1]
+            two_s * (i * k + j * r),  # R[0,2]
+            two_s * (i * j + k * r),  # R[1,0]
+            1 - two_s * (i * i + k * k),  # R[1,1]
+            two_s * (j * k - i * r),  # R[1,2]
+            two_s * (i * k - j * r),  # R[2,0]
+            two_s * (j * k + i * r),  # R[2,1]
+            1 - two_s * (i * i + j * j),  # R[2,2]
         ),
         -1,
     )
     return einops.rearrange(o, "... (i j) -> ... i j", i=3, j=3)
 
 
-def pose_from_quaternion(pose):  # input is w2c, pose(n,7) or (n,v,7)
-    # tensor in https://github.com/pointrix-project/Geomotion/blob/6ab0c364f1b44ab4ea190085dbf068f62b42727c/geomotion/model/cameras.py#L6
+def pose_from_quaternion(pose):
+    """
+    Convert quaternion-based pose representation to 4x4 transformation matrices.
+
+    Reference:
+        https://github.com/pointrix-project/Geomotion/blob/6ab0c364f1b44ab4ea190085dbf068f62b42727c/geomotion/model/cameras.py#L6
+    """
+    # Convert numpy array to torch tensor if needed
     if type(pose) == np.ndarray:
         pose = torch.tensor(pose)
+    # Add batch dimension if input is 1D
     if len(pose.shape) == 1:
         pose = pose[None]
-    quat_t = pose[..., :3]
-    quat_r = pose[..., 3:]
+    # Extract translation and quaternion components
+    quat_t = pose[..., :3]  # Translation components [tx, ty, tz]
+    quat_r = pose[..., 3:]  # Quaternion components [qi, qj, qk, qr]
+
+    # Initialize world-to-camera transformation matrix
     w2c_matrix = torch.zeros((*list(pose.shape)[:-1], 3, 4), device=pose.device)
-    w2c_matrix[..., :3, 3] = quat_t
-    w2c_matrix[..., :3, :3] = quaternion_to_matrix(quat_r)
+    w2c_matrix[..., :3, 3] = quat_t  # Set translation part
+    w2c_matrix[..., :3, :3] = quaternion_to_matrix(quat_r)  # Set rotation part
     return w2c_matrix
 
 
 def viz_poses(i, pth, file, args):
-    """Visualize camera poses for a sequence and write to HTML file."""
+    """
+    Visualize camera poses for a sequence and write to HTML file.
+    """
     file.write(f"<span style='font-size: 18pt;'>{i} {pth}</span><br>")
 
-    pose = np.load(pth)  #
-    poses = pose_from_quaternion(
-        pose
-    )  # pose: (N,7), after_pose (N,3,4) after_pose: w2c
+    # Load pose data from file
+    pose = np.load(pth)
+
+    # Convert quaternion poses to transformation matrices
+    poses = pose_from_quaternion(pose)  # Input: (N,7), Output: (N,3,4) w2c matrices
     poses = poses.cpu().numpy()
 
-    # Scale camera positions to reduce distance between pentagons
+    # Scale camera positions to reduce distance between camera frustums for better visualization
     scale_factor = getattr(
         args, "scale_factor", 0.3
-    )  # Default scale factor 0.3, can be adjusted via parameter
+    )  # Default scale factor 0.3, adjustable via command line parameter
 
-    # Scale translation part (camera position)
+    # Apply scaling to translation part (camera positions) while keeping rotation unchanged
+    # Create scaled copy of poses
     poses_scaled = poses.copy()
     poses_scaled[..., :3, 3] = poses[..., :3, 3] * scale_factor
 
     print(f"Original poses shape: {poses.shape}")
     print(f"Applied scale factor: {scale_factor}")
 
+    # Generate visualization based on dynamic flag
     if args.dynamic:
         write_html_animated(poses_scaled, file, vis_depth=args.vis_depth)
     else:
@@ -1137,43 +1162,61 @@ def viz_poses(i, pth, file, args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    # Set up command-line argument parser
+    parser = argparse.ArgumentParser(
+        description="Visualize camera poses with interactive 3D plots",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
     parser.add_argument(
-        "--datas", type=str, nargs="+", help="List of sequences to visualize poses for."
+        "--datas",
+        type=str,
+        nargs="+",
+        required=True,
+        help="List of pose file paths (.npz format) to visualize.",
     )
     parser.add_argument(
         "--vis_depth",
         type=float,
         default=0.2,
-        help="Depth of camera frustum visualization.",
+        help="Depth of camera frustum visualization (default: 0.2).",
     )
     parser.add_argument(
         "--scale_factor",
         type=float,
         default=0.3,
-        help="Scale factor to reduce distance between cameras (smaller = closer cameras).",
+        help="Scale factor to reduce distance between cameras - smaller values bring cameras closer together (default: 0.3).",
     )
     parser.add_argument(
         "--outdir",
         type=str,
         default="./visualize",
-        help="Output directory to save HTML files.",
+        help="Output directory to save HTML visualization files (default: ./visualize).",
     )
     parser.add_argument(
         "--dynamic",
         action="store_true",
-        help="Whether to create an animated visualization showing camera trajectory over time.",
+        help="Create animated visualization showing camera trajectory progression over time.",
     )
 
-    global args
+    # Parse command-line arguments
     args = parser.parse_args()
 
-    # define dataset paths
+    # Create output directory and process pose files
     os.makedirs(args.outdir, exist_ok=True)
+
+    print(f"Processing {len(args.datas)} pose file(s)...")
+    print(f"Output directory: {args.outdir}")
+    print(f"Visualization type: {'Animated' if args.dynamic else 'Static'}")
+
     with open(f"{args.outdir}/visualize.html", "w") as file:
-        for i, pth in enumerate(tqdm(args.datas)):
+        for i, pth in enumerate(tqdm(args.datas, desc="Processing pose files")):
             if not os.path.exists(pth):
-                print(f"Path {pth} does not exist, skipping.")
+                print(f"Warning: Path {pth} does not exist, skipping.")
                 continue
-            print(pth, i)
+            print(f"Processing: {pth} (#{i+1})")
             viz_poses(i, pth, file, args)
+
+    print(
+        f"Visualization complete! Open {args.outdir}/visualize.html in your browser to view results."
+    )
