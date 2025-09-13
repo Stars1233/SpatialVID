@@ -87,6 +87,12 @@ Significant progress has been made in spatial intelligence, spanning both spatia
    python setup.py install
    ```
 
+4. [Optional] Package needed for visualization
+
+   ```bash
+   pip install -e viser
+   ```
+
 ### Model Weight
 
 Download the model weights used in our experiments:
@@ -146,6 +152,11 @@ The whole pipeline is illustrated in the figure below:
    - `SRC_DIR` is the annotation output directory, default is the same as the `OUTPUT_DIR` in the annotation step.
    - `OUTPUT_DIR` is the directory where the output files will be saved.
    - The API keys for the LLM models used in the captioning step. You can replace them with your own API keys.
+4. Visualization
+
+   - You can visualize the `poses.npy` in the `reconstruction` folder of each annotated clip using the [`visualize_pose.py`](viser/visualize_pose.py) script.
+   - You can visualize the final annotation result(`sgd_cvd_hr.npz`) using the [`visualize_megasam.py`](viser/visualize_megasam.py) script.
+
 
 ## Dataset Download
 
