@@ -152,7 +152,7 @@ The whole pipeline is illustrated in the figure below:
 
 Apart from downloading the dataset using terminal commands, we provide scripts to download the SpatialVID/SpatialVID-HQ dataset from HuggingFace. Please refer to the [`download_SpatialVID.py`](utils/download_SpatialVID.py) script for more details.
 
-We also provide our script to download the raw videos from YouTube. You can refer to the [`download_raw_videos.py`](utils/download_raw_videos.py) script for more details.
+We also provide our script to download the raw videos from YouTube. You can refer to the [`download_YouTube.py`](utils/download_YouTube.py) script for more details.
 
 ## References
 
