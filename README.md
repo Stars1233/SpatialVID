@@ -41,8 +41,8 @@ Significant progress has been made in spatial intelligence, spanning both spatia
 
 ## 🎉NEWS
 + [2025.09.18] 🎆 SpatialVID dataset is now available on both HuggingFace and ModelScope.
-+ [2025.09.14] 📢 We have also uploaded the SpatialVid-HQ dataset to ModelScope offering more diverse download options.
-+ [2025.09.11] 🔥 Our paper, code and SpatialVid-HQ dataset are released!
++ [2025.09.14] 📢 We have also uploaded the SpatialVID-HQ dataset to ModelScope offering more diverse download options.
++ [2025.09.11] 🔥 Our paper, code and SpatialVID-HQ dataset are released!
 
 ## Preparation
 
