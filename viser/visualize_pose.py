@@ -1173,7 +1173,7 @@ if __name__ == "__main__":
         type=str,
         nargs="+",
         required=True,
-        help="List of pose file paths (.npz format) to visualize.",
+        help="List of pose file paths (.npy format) to visualize.",
     )
     parser.add_argument(
         "--vis_depth",
