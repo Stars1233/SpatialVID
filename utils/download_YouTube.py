@@ -154,10 +154,12 @@ def add_download(csv_path):
     Download missing videos according to the new_vid_path field in the CSV file.
     """
     data = pd.read_csv(csv_path)
-    for _, row in data.iterrows():
-        video_url = f"https://www.youtube.com/watch?v={row["YouTube id"]}"
+    unique_ids = data['YouTube id'].unique()
+
+    for uid in unique_ids:
+        video_url = f"https://www.youtube.com/watch?v={uid}"
         ytb_download(video_url, json_info={}, output_dir="videos/")
-        print(f"Downloaded {video_url} to {video_path}")
+        print(f"Downloaded {video_url}")
 
 
 if __name__ == "__main__":
