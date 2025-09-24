@@ -155,9 +155,7 @@ def add_download(csv_path):
     """
     data = pd.read_csv(csv_path)
     for _, row in data.iterrows():
-        video_path = row["new_vid_path"]
-        video_url = os.path.splitext(os.path.basename(video_path))[0]
-        video_url = f"https://www.youtube.com/watch?v={video_url}"
+        video_url = f"https://www.youtube.com/watch?v={row["YouTube id"]}"
         ytb_download(video_url, json_info={}, output_dir="videos/")
         print(f"Downloaded {video_url} to {video_path}")
 
