@@ -1,6 +1,17 @@
 """
 Utility script to download YouTube videos using yt-dlp with support for concurrency and sharding.
 Adapted from https://huggingface.co/Ligeng-Zhu/panda70m-download
+
+running script: python download_YouTube.py --csv="$csv_file" # this csv file must contains 'url' column
+
+if you want to download a specific youtube video, consider using:
+- yt-dlp -F --list-formats https://www.youtube.com/watch\?v\=omP01s7RUSA # --proxy 127.0.0.1:xxxx --cookies cookies.txt
+
+run 'ls -l /path/to/folder/*.json | wc -l' for counting the videos already downloaded
+
+Customization Guide: 
+    For customizing download settings (such as video format, cookie configurations like automatic Chrome cookie retrieval or custom cookie file usage), 
+    refer to the official documentation at https://github.com/yt-dlp/yt-dlp-wiki.
 """
 
 import sys, os, os.path as osp
@@ -20,11 +31,10 @@ def ytb_download(url, json_info, output_dir="ytb_videos/"):
     os.makedirs(output_dir, exist_ok=True)
     uid = url.split("?v=")[-1]
     yt_opts = {
-        # "format": "bv[height=720][ext=mp4]"
+        "format": "bv[height=720][ext=mp4]"
         # "format": "bv[height=720]",  # Download the best quality available
-        "format": "bv",  # for panda70m
         # "format": "bv[height=720][ext=mp4][vcodec!^=av]",
-        "proxy": "127.0.0.1:7893",
+        # "proxy": "127.0.0.1:xxxx",
         "outtmpl": osp.join(output_dir, f"{uid}.%(ext)s"),  # Output template
         # "cookiesfrombrowser": "chrome",  # Use Chrome's cookies automatically
         # "cookiefile": "cookies.txt",  # Use a custom cookies file
@@ -57,6 +67,7 @@ def ytb_download(url, json_info, output_dir="ytb_videos/"):
         with open(meta_path, "w") as fp:
             json.dump(json_info, fp, indent=2)
         return 0
+    # exception logs
     except Exception as e:
         print(f"\033[91mError downloading {url}: {e}\033[0m")
         err_map = {
@@ -94,7 +105,8 @@ async def main(csv_path, output_dir, max_workers=10, shards=0, total=-1, limit=F
     tasks = []
     for idx, (index, row) in enumerate(data_list):
         video_url = row["url"]
-        json_info = {"caption": row["caption"]}
+        # json_info = {"caption": row["caption"]}
+        json_info = {"caption": ''} # for file checking.
         tasks.append(
             loop.run_in_executor(PPE, ytb_download, video_url, json_info, output_dir)
         )
@@ -152,5 +164,6 @@ def add_download(csv_path):
 
 if __name__ == "__main__":
     # Call entry function via command line arguments
+    
     fire.Fire(entry)
-    # To supplement download: add_download(csv_path='xxx.csv')
+    # for supplement download: add_download(csv_path='xxx.csv')
