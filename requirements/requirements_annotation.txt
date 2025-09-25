@@ -8,3 +8,5 @@ gradio==4.29.0
 # sam2
 hydra-core==1.3.2
 iopath==0.1.10
+
+OpenEXR
