@@ -5,6 +5,8 @@ Camera Pose Visualization Module
 This module provides comprehensive tools for visualizing camera poses and trajectories
 in 3D space using Plotly. It supports both static and animated visualizations with
 automatic camera view optimization.
+
+Adapted from: https://huggingface.co/datasets/nvidia/dynpose-100k/blob/main/scripts/visualize_pose.py
 """
 
 import argparse
