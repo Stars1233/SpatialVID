@@ -30,6 +30,24 @@ from lietorch import SE3
 import numpy as np
 import torch
 
+import zipfile
+import tempfile
+import OpenEXR
+import Imath
+
+
+def save_depth(path, depths):
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for index, depth in enumerate(depths):
+            height, width = depth.shape
+            header = OpenEXR.Header(width, height)
+            header["channels"] = {"Z": Imath.Channel(Imath.PixelType(Imath.PixelType.HALF))}
+            with tempfile.NamedTemporaryFile(suffix=".exr") as f:
+                exr = OpenEXR.OutputFile(f.name, header)
+                exr.writePixels({"Z": depth.astype(np.float16).tobytes()})
+                exr.close()
+                z.write(f.name, f"{index:05d}.exr")
+
 
 def gradient_loss(gt, pred, u):
     """Gradient loss."""
@@ -229,6 +247,7 @@ def parse_args():
     parser.add_argument("--w_grad", type=float, default=2.0, help="w_grad")
     parser.add_argument("--w_normal", type=float, default=6.0, help="w_normal")
     parser.add_argument("--dir_path", type=str, default=".", help="directory path")
+    parser.add_argument("--only_depth", action="store_true", help="only save optimize depth")
 
     return parser.parse_args()
 
@@ -426,10 +445,16 @@ if __name__ == "__main__":
         .numpy()
     )
 
-    np.savez(
-        os.path.join(args.dir_path, "sgd_cvd_hr.npz"),
-        images=np.uint8(img_data_pt.cpu().numpy().transpose(0, 2, 3, 1) * 255.0),
-        depths=np.clip(np.float16(1.0 / disp_data_opt), 1e-3, 1e2),
-        intrinsic=K_o.detach().cpu().numpy(),
-        cam_c2w=cam_c2w.detach().cpu().numpy(),
-    )
+    if args.only_depth:
+        save_depth(
+            os.path.join(args.dir_path, "depth_opt.zip"),
+            disp_data_opt
+        )
+    else:
+        np.savez(
+            os.path.join(args.dir_path, "sgd_cvd_hr.npz"),
+            images=np.uint8(img_data_pt.cpu().numpy().transpose(0, 2, 3, 1) * 255.0),
+            depths=np.clip(np.float16(1.0 / disp_data_opt), 1e-3, 1e2),
+            intrinsic=K_o.detach().cpu().numpy(),
+            cam_c2w=cam_c2w.detach().cpu().numpy(),
+        )
