@@ -163,7 +163,7 @@ The whole pipeline is illustrated in the figure below:
    - You can visualize the `poses.npy` in the `reconstruction` folder of each annotated clip using the [`visualize_pose.py`](viser/visualize_pose.py) script.
    - You can visualize the final annotation result(`sgd_cvd_hr.npz`) using the [`visualize_megasam.py`](viser/visualize_megasam.py) script.
    
-   Note that if you want to visualize any clip in our dataset, you need to use the script ['pack_clip_assets.py'](utils/pack_clip_assets.py) to unify the depth, RGB frames, intrinsics, extrinsics, etc. of that clip into a single npz file first. And then you can use the visualization script to visualize it.
+   Note that if you want to visualize any clip in our dataset, you need to use the script [`pack_clip_assets.py`](utils/pack_clip_assets.py) to unify the depth, RGB frames, intrinsics, extrinsics, etc. of that clip into a single npz file first. And then you can use the visualization script to visualize it.
 
 ## Dataset Download
 
