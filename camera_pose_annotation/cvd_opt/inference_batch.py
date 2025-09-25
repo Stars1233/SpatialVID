@@ -24,6 +24,8 @@ def process_single_row(row, index, args, worker_id=0):
         f"--dir_path {dir_path} "
         f"--w_grad 2.0 --w_normal 5.0 "
     )
+    if args.only_depth:
+        cmd += "--only_depth "
     process = subprocess.Popen(
         cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
@@ -49,6 +51,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv_path", type=str, help="Path to the csv file")
     parser.add_argument("--dir_path", type=str, default="./outputs")
+    parser.add_argument("--only_depth", action="store_true", help="Only save optimized depth")
     parser.add_argument(
         "--gpu_id", type=str, default="0", help="Comma-separated list of GPU IDs to use"
     )
