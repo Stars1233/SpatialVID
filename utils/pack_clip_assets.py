@@ -1,10 +1,10 @@
 """
-unify_sgd.py
+pack_clip_assets.py
 ------------------
 This script unifies depth, RGB frames, intrinsics, extrinsics, etc. of a specified video clip into a single npz file for downstream 3D reconstruction or analysis.
 
 Usage example:
-    python unify_sgd.py --base_dir /path/to/HQ --clip_id group_xxxx/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx --height 328 --width 584
+    python pack_clip_assets.py --base_dir /path/to/HQ --clip_id group_xxxx/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx --height 328 --width 584
 
 """
 
@@ -75,21 +75,22 @@ def main():
     """
     Main pipeline: load depth, RGB frames, intrinsics, extrinsics, and save as npz.
     """
-    parser = argparse.ArgumentParser(description="Unify SGD-related data and export as npz file")
+    parser = argparse.ArgumentParser(description="Pack clip assets into a single npz file.")
     parser.add_argument('--base_dir', type=str, required=True, help='Root directory of HQ data')
-    parser.add_argument('--clip_id', type=str, required=True, help='Clip ID, e.g. group_xxxx/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')
+    parser.add_argument('--group_id', type=int, required=False, help='Group ID, e.g. group_xxxx')
+    parser.add_argument('--clip_id', type=str, required=True, help='Clip ID, e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')
     parser.add_argument('--height', type=int, default=328, help='Output image height')
     parser.add_argument('--width', type=int, default=584, help='Output image width')
-    parser.add_argument('--output', type=str, default='sgd_cvd_hr1.npz', help='Output npz filename')
+    parser.add_argument('--output', type=str, default='sgd_cvd_hr.npz', help='Output npz filename')
     args = parser.parse_args()
 
     # Path construction
-    annotation_path = f'{args.base_dir}/annotations/{args.clip_id}'
-    depth_path = f'{args.base_dir}/depths/{args.clip_id}.zip'
-    clip_path = f'{args.base_dir}/videos/{args.clip_id}.mp4'
-    intrinsics_path = f'{annotation_path}/intrinsics.npy'
-    extrinsics_path = f'{annotation_path}/poses.npy'
-    indexes_path = f'{annotation_path}/indexes.txt'
+    annotation_dir = f'{args.base_dir}/annotations/group_{args.group_id:04d}/{args.clip_id}'
+    depth_path = f'{args.base_dir}/depths/group_{args.group_id:04d}/{args.clip_id}.zip'
+    clip_path = f'{args.base_dir}/videos/group_{args.group_id:04d}/{args.clip_id}.mp4'
+    intrinsics_path = f'{annotation_dir}/intrinsics.npy'
+    extrinsics_path = f'{annotation_dir}/poses.npy'
+    indexes_path = f'{annotation_dir}/indexes.txt'
 
     # Load intrinsics and extrinsics
     intrinsics = load_intrinsics(intrinsics_path, tgt_width=args.width, tgt_height=args.height)
