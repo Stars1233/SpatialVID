@@ -5,6 +5,7 @@ mkdir -p ${OUTPUT_DIR}
 
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 GPU_NUM=8
+ENHANCED=true  # Set to true to enable enhanced instruction generation
 
 measure_time() {
     local step_number=$1
@@ -89,11 +90,19 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 6 python utils/evaluat
   --output_path ${OUTPUT_DIR}/final_results.csv
 
 # 7. Get motion instructions
-CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 7 python utils/get_instructions.py \
-  --csv_path ${CSV} \
-  --dir_path ${OUTPUT_DIR} \
-  --interval 2 \
-  --num_workers $((GPU_NUM * 2))
+if [ "$ENHANCED" = false ] ; then
+  CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 7 python utils/get_instructions.py \
+    --csv_path ${CSV} \
+    --dir_path ${OUTPUT_DIR} \
+    --interval 2 \
+    --num_workers $((GPU_NUM * 2))
+else
+  echo "Standard instruction generation is enabled."
+  CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 7 python utils/get_instructions_enhanced.py \
+    --csv_path ${OUTPUT_DIR}/final_results.csv \
+    --dir_path ${OUTPUT_DIR} \
+    --num_workers $((GPU_NUM * 2))
+fi
 
 # 8. Normalize the intrinsics
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 8 python utils/normalize_intrinsics.py \
