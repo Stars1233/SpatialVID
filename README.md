@@ -77,7 +77,7 @@ Significant progress has been made in spatial intelligence, spanning both spatia
 
    ```bash
    pip uninstall opencv-python
-   conda install -c conda-forge opencv
+   conda install -c conda-forge opencv==4.11.0
    ```
 3. Package needed for annotation
 
