@@ -69,7 +69,7 @@ Significant progress has been made in spatial intelligence, spanning both spatia
 
    Ignore the warning about `nvidia-nccl-cu12` and `numpy` version, it is not a problem.
 
-   About FFMPEG, please refer to the [INSTALL.md](scoring/motion/INSTALL.md) for detailed instructions on how to install ffmpeg. After installation, replace the `FFMPEG_PATH` variable in the [`scoring/motion/inference.py`](scoring/motion/inference.py) and [`utils/cut.py`](utils/cut.py) with the actual path to your ffmpeg executable, default is `/usr/local/bin/ffmpeg`.
+   About FFMPEG, please refer to the [`INSTALL.md`](scoring/motion/INSTALL.md) for detailed instructions on how to install ffmpeg. After installation, replace the `FFMPEG_PATH` variable in the [`scoring/motion/inference.py`](scoring/motion/inference.py) and [`utils/cut.py`](utils/cut.py) with the actual path to your ffmpeg executable, default is `/usr/local/bin/ffmpeg`.
 
    [Optional] if your videos are in av1 codec instead of h264, you need to install ffmpeg (already in our requirement script), then run the following to make conda support av1 codec:
 
