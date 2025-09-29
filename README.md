@@ -36,7 +36,7 @@
 </p>
 
 ## 🎉NEWS
-
++ [2025.09.29] 🚀 Depth data for the SpatialVID-HQ dataset is now officially available.
 + [2025.09.24] 🤗 Raw metadata access is now available via a [gated HuggingFace dataset](https://huggingface.co/datasets/SpatialVID/SpatialVID-RAW) to better support community research!!
 + [2025.09.24] 🔭 Enhanced instructions for better camera control are updated.
 + [2025.09.18] 🎆 SpatialVID dataset is now available on both HuggingFace and ModelScope.
