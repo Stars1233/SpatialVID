@@ -2,22 +2,6 @@
 
 This guide provides a comprehensive walkthrough for compiling FFmpeg from source on an Ubuntu system equipped with an NVIDIA GPU. The resulting build will support NVIDIA's hardware encoding/decoding (NVENC/NVDEC), NPP filters (NVIDIA Performance Primitives), and CUDA-based VMAF (Video Multi-Method Assessment Fusion) for video quality assessment.
 
-## Table of Contents
-
-- [Environment and Versions](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-- [Compilation Steps](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-    - [Step 1: Install System Dependencies](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-    - [Step 2: Install Meson and Ninja Build Tools](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-    - [Step 3: Install NVIDIA Codec Headers](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-    - [Step 4: Compile and Install VMAF (libvmaf)](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-    - [Step 5: Compile and Install FFmpeg](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-- [Verify the Installation](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-- [Usage Example](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-- [Troubleshooting](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-    - [Issue 1: VMAF compilation fails with `vcs_version.h: No such file or directory`](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-    - [Issue 2: FFmpeg `configure` fails with error about Video Codec SDK version being too low](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-- [References](https://www.notion.so/gemini-update-27de345300e4809799a1c1295bea1d69?pvs=21)
-
 ## Environment and Versions
 
 Before you begin, ensure your system environment is similar to the configuration below. Version matching is crucial for a successful compilation.
@@ -306,6 +290,7 @@ ffmpeg -hwaccel cuda -hwaccel_output_format cuda -i distorted_video.mp4 -i refer
 
 ## References
 
+- [VMAF](https://github.com/Netflix/vmaf)
 - [FFmpeg Official Source](https://github.com/FFmpeg/FFmpeg/tree/release/6.1)
 - [NVIDIA Codec Headers Source](https://github.com/FFmpeg/nv-codec-headers/tree/sdk/12.1)
 - [Official NVIDIA Guide for Compiling FFmpeg](https://docs.nvidia.com/video-technologies/video-codec-sdk/11.1/ffmpeg-with-nvidia-gpu/index.html)
