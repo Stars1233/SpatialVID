@@ -97,7 +97,7 @@ def main():
     extrinsics = np.load(extrinsics_path)
 
     # Load and resize depth
-    depth = read_depth(depth_path)  # (N, H, W)
+    depth = np.clip(read_depth(depth_path), 1e-3, 1e2)  # (N, H, W)
     resized_depth = np.zeros((depth.shape[0], args.height, args.width), dtype=depth.dtype)
     for i in range(depth.shape[0]):
         resized_depth[i] = cv2.resize(depth[i], (args.width, args.height), interpolation=cv2.INTER_LINEAR)
