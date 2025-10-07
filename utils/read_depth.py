@@ -28,4 +28,4 @@ def read_depth(zip_file_path):
                 depth_data = np.frombuffer(
                     channels[0], dtype=np.float16).reshape((height, width))
                 depth_data_list.append(depth_data.astype(np.float32))
-    return np.clip(1.0 / np.array(depth_data_list), 1e-3, 1e2)
+    return 1.0 / np.array(depth_data_list)
