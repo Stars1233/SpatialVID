@@ -28,4 +28,6 @@ def read_depth(zip_file_path):
                 depth_data = np.frombuffer(
                     channels[0], dtype=np.float16).reshape((height, width))
                 depth_data_list.append(depth_data.astype(np.float32))
+    # Note that the depth with a negative value is an invalid depth.
+    # It can be set to the farthest point or other operations.
     return 1.0 / np.array(depth_data_list)
