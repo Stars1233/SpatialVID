@@ -5,7 +5,7 @@ import OpenEXR
 
 def read_depth(zip_file_path):
     """
-    Read metric depth from zipped exr files.
+    Read depth from zipped exr files.
     """
     valid_width, valid_height = 0, 0
     depth_data_list = []
