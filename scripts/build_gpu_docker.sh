@@ -10,6 +10,22 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 2
 fi
 
+# Quick permission check: can we talk to the docker daemon?
+if ! docker info >/dev/null 2>&1; then
+  echo ""
+  echo "ERROR: cannot connect to the Docker daemon. Permission denied or daemon not running."
+  echo "Common fixes (pick one):"
+  echo "  1) Run the script with sudo (quick, but files may be created as root):"
+  echo "       sudo ./scripts/build_gpu_docker.sh"
+  echo "  2) Add your user to the 'docker' group and re-login (recommended):"
+  echo "       sudo usermod -aG docker \$USER"
+  echo "       # then log out and log back in, or run: newgrp docker"
+  echo "  3) If Docker is installed as snap, use sudo or follow snap-specific docs."
+  echo "  4) Ensure daemon is running: sudo systemctl start docker" 
+  echo ""
+  exit 3
+fi
+
 echo "[2/6] Checking NVIDIA runtime support via a test container (this may fail if no GPU or toolkit)..."
 if docker run --rm --gpus all nvidia/cuda:12.1-runtime-ubuntu22.04 nvidia-smi >/dev/null 2>&1; then
   echo "NVIDIA runtime is available. Will build with GPU support.";
