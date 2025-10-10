@@ -1,0 +1,86 @@
+# GPU-enabled Dockerfile for SpatialVID
+# Builds libvmaf and FFmpeg with NVIDIA acceleration (NVENC/NVDEC) and libvmaf_cuda
+# WARNING: This is a large build and must run on a host with NVIDIA drivers and CUDA installed.
+
+ARG UBUNTU_VERSION=22.04
+ARG CUDA_BASE_IMAGE=nvidia/cuda:12.1-devel-ubuntu22.04
+FROM ${CUDA_BASE_IMAGE} as builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+
+# Install build tools and dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential yasm cmake libtool libc6-dev unzip wget git pkg-config \
+    python3 python3-pip python3-venv ninja meson nasm ca-certificates libnuma-dev \
+    libx264-dev libx265-dev libvpx-dev libfdk-aac-dev libmp3lame-dev libopus-dev \
+    libass-dev libfreetype6-dev libfribidi-dev libfontconfig1-dev libopenjp2-7-dev \
+    liblzma-dev libsnappy-dev zlib1g-dev libssl-dev libavdevice-dev libavfilter-dev \
+    libavformat-dev libavcodec-dev pkg-config && rm -rf /var/lib/apt/lists/*
+
+# Ensure pip tools
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
+
+WORKDIR /workspace/build
+
+# nv-codec-headers (NVIDIA Video Codec SDK headers) - choose branch matching CUDA
+ARG NV_CODEC_HEADERS_BRANCH=sdk/12.1
+RUN git clone https://github.com/FFmpeg/nv-codec-headers.git /workspace/build/nv-codec-headers \
+ && cd /workspace/build/nv-codec-headers \
+ && git checkout ${NV_CODEC_HEADERS_BRANCH} \
+ && make install
+
+# Build libvmaf with CUDA support
+RUN git clone https://github.com/Netflix/vmaf.git /workspace/build/vmaf \
+ && cd /workspace/build/vmaf \
+ && git checkout v2.3.1 || true \
+ && meson setup libvmaf/build libvmaf --buildtype=release -Denable_cuda=true \
+    -Dcuda_include_dir=/usr/local/cuda/include -Dcuda_lib_dir=/usr/local/cuda/lib64 -Dcuda_compiler=/usr/local/cuda/bin/nvcc \
+ && ninja -C libvmaf/build \
+ && ninja -C libvmaf/build install \
+ && ldconfig
+
+# Build FFmpeg with nvenc/npp and libvmaf
+ARG FFMPEG_TAG=release/6.1
+RUN git clone https://github.com/FFmpeg/FFmpeg.git /workspace/build/FFmpeg \
+ && cd /workspace/build/FFmpeg \
+ && git checkout ${FFMPEG_TAG} \
+ && ./configure --enable-nonfree --enable-cuda-nvcc --enable-libnpp \
+      --extra-cflags=-I/usr/local/cuda/include --extra-ldflags=-L/usr/local/cuda/lib64 \
+      --disable-static --enable-shared --enable-libvmaf --enable-gpl --enable-libx264 --enable-libx265 --enable-libvpx --enable-libfdk-aac --enable-libmp3lame --enable-libopus --enable-libass \
+ && make -j$(nproc) \
+ && make install \
+ && ldconfig
+
+# Create a smaller runtime image
+FROM nvidia/cuda:12.1-runtime-ubuntu22.04 as runtime
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates python3 python3-pip python3-venv ffmpeg libnuma-dev libsm6 libxext6 libxrender1 libgl1 && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Copy FFmpeg and libvmaf from builder (installed under /usr/local)
+COPY --from=builder /usr/local /usr/local
+# copy libraries installed by the builder stage if present
+COPY --from=builder /usr/lib/ /usr/lib/
+
+# Link python
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
+
+# Copy repository
+COPY . /workspace
+
+# Install Python requirements (may still fail for some packages requiring system libs)
+RUN pip3 --no-cache-dir install -r requirements/requirements.txt
+RUN pip3 --no-cache-dir install -r requirements/requirements_scoring.txt || true
+RUN pip3 --no-cache-dir install -r requirements/requirements_annotation.txt || true
+
+# Entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENV FFMPEG_PATH=/usr/local/bin/ffmpeg
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["bash"]

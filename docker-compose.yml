@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  spatialvid:
+    build: .
+    image: spatialvid:latest
+    volumes:
+      - ./:/workspace:cached
+    working_dir: /workspace
+    environment:
+      - FFMPEG_PATH=/usr/bin/ffmpeg
+    deploy:
+      resources: {}
+    tty: true
+    stdin_open: true
