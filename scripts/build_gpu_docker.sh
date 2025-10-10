@@ -20,7 +20,14 @@ fi
 IMAGE_TAG="spatialvid:gpu:local"
 
 echo "[3/6] Building GPU image with Dockerfile.gpu (this may take a long time)..."
-DOCKER_BUILDKIT=1 docker build --progress=plain -f Dockerfile.gpu -t ${IMAGE_TAG} .
+# Prefer buildx/BuildKit if available for better output; otherwise fall back
+if docker buildx version >/dev/null 2>&1; then
+  echo "docker buildx detected — using BuildKit for build"
+  DOCKER_BUILDKIT=1 docker build --progress=plain -f Dockerfile.gpu -t ${IMAGE_TAG} .
+else
+  echo "docker buildx not detected — falling back to classic docker build"
+  docker build -f Dockerfile.gpu -t ${IMAGE_TAG} .
+fi
 
 echo "[4/6] Checking ffmpeg version inside built image"
 docker run --rm --gpus all ${IMAGE_TAG} ffmpeg -version | sed -n '1,12p' || true
