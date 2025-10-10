@@ -18,7 +18,7 @@ if ! docker info >/dev/null 2>&1; then
   echo "  1) Run the script with sudo (quick, but files may be created as root):"
   echo "       sudo ./scripts/build_gpu_docker.sh"
   echo "  2) Add your user to the 'docker' group and re-login (recommended):"
-  echo "       sudo usermod -aG docker \$USER"
+  echo "       sudo usermod -aG docker \$USER" ; newgrp docker
   echo "       # then log out and log back in, or run: newgrp docker"
   echo "  3) If Docker is installed as snap, use sudo or follow snap-specific docs."
   echo "  4) Ensure daemon is running: sudo systemctl start docker" 
@@ -33,7 +33,7 @@ else
   echo "Warning: NVIDIA runtime test failed. Build may still succeed, but runtime NVENC/NNDEC features won't work on this host.";
 fi
 
-IMAGE_TAG="spatialvid:gpu:local"
+IMAGE_TAG="spatialvid:gpu-local"
 
 echo "[3/6] Building GPU image with Dockerfile.gpu (this may take a long time)..."
 # Prefer buildx/BuildKit if available for better output; otherwise fall back
