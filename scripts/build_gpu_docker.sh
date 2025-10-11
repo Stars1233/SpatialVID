@@ -18,7 +18,7 @@ if ! docker info >/dev/null 2>&1; then
   echo "  1) Run the script with sudo (quick, but files may be created as root):"
   echo "       sudo ./scripts/build_gpu_docker.sh"
   echo "  2) Add your user to the 'docker' group and re-login (recommended):"
-  echo "       sudo usermod -aG docker \$USER" ; newgrp docker
+  echo "       sudo usermod -aG docker \$USER" ; 
   echo "       # then log out and log back in, or run: newgrp docker"
   echo "  3) If Docker is installed as snap, use sudo or follow snap-specific docs."
   echo "  4) Ensure daemon is running: sudo systemctl start docker" 
@@ -36,10 +36,58 @@ fi
 IMAGE_TAG="spatialvid:gpu-local"
 
 echo "[3/6] Building GPU image with Dockerfile.gpu (this may take a long time)..."
+# Pre-pull base images used by Dockerfile.gpu to fail early on network/auth issues
+BUILDER_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04"
+RUNTIME_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04"
+
+echo "Pre-pulling base images to validate network/auth and warm cache:"
+retry_pull() {
+  local img="$1"
+  local i
+  for i in 1 2 3; do
+    echo "  pull attempt $i for ${img}..."
+    if docker pull "${img}"; then
+      echo "  pulled ${img}"
+      return 0
+    fi
+    sleep $((i * 2))
+  done
+  echo "Failed to pull ${img} after retries" >&2
+  return 1
+}
+
+echo "- builder: ${BUILDER_IMAGE}"
+echo "- runtime: ${RUNTIME_IMAGE}"
+retry_pull "${BUILDER_IMAGE}" || true
+retry_pull "${RUNTIME_IMAGE}" || true
+
+USE_BUILDX_CACHE=${USE_BUILDX_CACHE:-1}
 # Prefer buildx/BuildKit if available for better output; otherwise fall back
 if docker buildx version >/dev/null 2>&1; then
   echo "docker buildx detected — using BuildKit for build"
-  DOCKER_BUILDKIT=1 docker build --progress=plain -f Dockerfile.gpu -t ${IMAGE_TAG} .
+  if [ "${USE_BUILDX_CACHE}" -eq 1 ]; then
+    echo "Using buildx local cache at ./.buildx-cache"
+    # Ensure a builder that supports cache export is available. Some drivers (docker driver) do not support cache export.
+    if ! docker buildx inspect spatialvid-builder >/dev/null 2>&1; then
+      echo "Creating buildx builder 'spatialvid-builder' (driver=docker-container)..."
+      if ! docker buildx create --name spatialvid-builder --driver docker-container --use >/dev/null 2>&1; then
+        echo "Warning: creating docker-container builder failed; falling back to cache-less build" >&2
+        DOCKER_BUILDKIT=1 docker buildx build --progress=plain -f Dockerfile.gpu -t ${IMAGE_TAG} .
+      else
+        echo "Builder created and selected: spatialvid-builder"
+        DOCKER_BUILDKIT=1 docker buildx build --progress=plain \
+          --cache-to type=local,dest=.buildx-cache --cache-from type=local,src=.buildx-cache \
+          -f Dockerfile.gpu -t ${IMAGE_TAG} .
+      fi
+    else
+      docker buildx use spatialvid-builder >/dev/null 2>&1 || true
+      DOCKER_BUILDKIT=1 docker buildx build --progress=plain \
+        --cache-to type=local,dest=.buildx-cache --cache-from type=local,src=.buildx-cache \
+        -f Dockerfile.gpu -t ${IMAGE_TAG} .
+    fi
+  else
+    DOCKER_BUILDKIT=1 docker build --progress=plain -f Dockerfile.gpu -t ${IMAGE_TAG} .
+  fi
 else
   echo "docker buildx not detected — falling back to classic docker build"
   docker build -f Dockerfile.gpu -t ${IMAGE_TAG} .
