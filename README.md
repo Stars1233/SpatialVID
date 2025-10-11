@@ -1,9 +1,3 @@
-Of course. I will organize and optimize the provided Docker instructions, translate them into clear English, and integrate them seamlessly into the project's README file.
-
-Here is the updated README content. I have added a new section titled "**Docker Setup and Usage**" which provides a comprehensive guide for users who prefer a containerized environment.
-
----
-
 <h1 align='center'>SpatialVID: A Large-Scale Video Dataset with Spatial Annotations</h1>
 <div align='center'>
     <a href='https://oiiiwjh.github.io/' target='_blank'>Jiahao Wang</a><sup>1*</sup> 
