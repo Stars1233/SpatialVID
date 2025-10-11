@@ -4,6 +4,27 @@ set -euo pipefail
 WORKDIR="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$WORKDIR"
 
+# Default parallel jobs; can be overridden by CLI --num-jobs or env NUM_JOBS
+NUM_JOBS=${NUM_JOBS:-8}
+
+# Simple CLI: support --num-jobs or -j
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --num-jobs|-j)
+      if [ $# -lt 2 ]; then
+        echo "Missing value for $1" >&2; exit 1
+      fi
+      NUM_JOBS="$2"; shift 2;;
+    --help|-h)
+      echo "Usage: $0 [--num-jobs N]"; exit 0;;
+    *)
+      # unknown; stop parsing
+      break;;
+  esac
+done
+
+echo "Using NUM_JOBS=${NUM_JOBS}"
+
 echo "[1/6] Checking docker availability..."
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker not found. Please install Docker and (for GPU) NVIDIA Container Toolkit." >&2
@@ -33,12 +54,12 @@ else
   echo "Warning: NVIDIA runtime test failed. Build may still succeed, but runtime NVENC/NNDEC features won't work on this host.";
 fi
 
-IMAGE_TAG="spatialvid:gpu-local"
+IMAGE_TAG="spatialvid-gpu:latest"
 
-echo "[3/6] Building GPU image with Dockerfile.gpu (this may take a long time)..."
-# Pre-pull base images used by Dockerfile.gpu to fail early on network/auth issues
-BUILDER_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04"
-RUNTIME_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04"
+echo "[3/6] Building GPU image with Dockerfile (this may take a long time)..."
+# Pre-pull base images used by Dockerfile to fail early on network/auth issues
+BUILDER_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04" # cuda:12.1.0-cudnn8-devel-ubuntu22.04
+RUNTIME_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-runtime-ubuntu22.04" # cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
 echo "Pre-pulling base images to validate network/auth and warm cache:"
 retry_pull() {
@@ -65,32 +86,58 @@ USE_BUILDX_CACHE=${USE_BUILDX_CACHE:-1}
 # Prefer buildx/BuildKit if available for better output; otherwise fall back
 if docker buildx version >/dev/null 2>&1; then
   echo "docker buildx detected — using BuildKit for build"
+  # Optional: allow overriding the BuildKit image used by the docker-container driver
+  BUILDKIT_IMAGE="${BUILDKIT_IMAGE:-swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/moby/buildkit:buildx-stable-1}" # moby/buildkit:buildx-stable-1
+
+  # If cache is requested, try to create/use a docker-container builder that can
+  # use a custom BuildKit image (useful when Docker Hub is blocked and you have a private mirror).
   if [ "${USE_BUILDX_CACHE}" -eq 1 ]; then
     echo "Using buildx local cache at ./.buildx-cache"
-    # Ensure a builder that supports cache export is available. Some drivers (docker driver) do not support cache export.
-    if ! docker buildx inspect spatialvid-builder >/dev/null 2>&1; then
-      echo "Creating buildx builder 'spatialvid-builder' (driver=docker-container)..."
-      if ! docker buildx create --name spatialvid-builder --driver docker-container --use >/dev/null 2>&1; then
-        echo "Warning: creating docker-container builder failed; falling back to cache-less build" >&2
-        DOCKER_BUILDKIT=1 docker buildx build --progress=plain -f Dockerfile.gpu -t ${IMAGE_TAG} .
-      else
-        echo "Builder created and selected: spatialvid-builder"
-        DOCKER_BUILDKIT=1 docker buildx build --progress=plain \
-          --cache-to type=local,dest=.buildx-cache --cache-from type=local,src=.buildx-cache \
-          -f Dockerfile.gpu -t ${IMAGE_TAG} .
-      fi
-    else
-      docker buildx use spatialvid-builder >/dev/null 2>&1 || true
-      DOCKER_BUILDKIT=1 docker buildx build --progress=plain \
-        --cache-to type=local,dest=.buildx-cache --cache-from type=local,src=.buildx-cache \
-        -f Dockerfile.gpu -t ${IMAGE_TAG} .
+    echo "Ensuring BuildKit image is available: ${BUILDKIT_IMAGE}"
+    retry_pull "${BUILDKIT_IMAGE}" || echo "Warning: could not pre-pull ${BUILDKIT_IMAGE}; builder creation may still attempt to pull it"
+
+    # Some buildx/bootstrap paths will try to pull the canonical image name
+    # 'moby/buildkit:buildx-stable-1'. To avoid touching Docker Hub, tag the
+    # pulled private mirror image to that canonical name locally so the daemon
+    # can find it without external access.
+    CANONICAL_BUILDKIT_TAG="moby/buildkit:buildx-stable-1"
+    if docker image inspect "${BUILDKIT_IMAGE}" >/dev/null 2>&1; then
+      echo "Tagging ${BUILDKIT_IMAGE} -> ${CANONICAL_BUILDKIT_TAG} (local only)"
+      docker tag "${BUILDKIT_IMAGE}" "${CANONICAL_BUILDKIT_TAG}" || true
     fi
+
+    # Create a named builder that runs as a container (supports cache export/import).
+    # If a builder with this name already exists, remove and recreate it so the
+    # desired BUILDKIT_IMAGE is used. Reusing an old builder can cause the
+    # daemon to pull the original moby/buildkit image (from Docker Hub) during
+    # bootstrap which fails in restricted networks.
+    if docker buildx inspect spatialvid-builder >/dev/null 2>&1; then
+      echo "Existing buildx builder 'spatialvid-builder' found — removing to ensure it uses ${BUILDKIT_IMAGE}"
+      if ! docker buildx rm spatialvid-builder >/dev/null 2>&1; then
+        echo "Warning: could not remove existing 'spatialvid-builder'. It may be in use by another process. Attempting to recreate anyway."
+      fi
+    fi
+
+    echo "Creating docker-container buildx builder 'spatialvid-builder' using BuildKit image ${BUILDKIT_IMAGE}"
+    if ! docker buildx create --name spatialvid-builder --driver docker-container --use --driver-opt image="${BUILDKIT_IMAGE}"; then
+      echo "Warning: failed to create docker-container builder with custom BuildKit image; will fall back to default buildx behavior (may fail to export cache)"
+    fi
+
+    # If we successfully have the named builder, instruct buildx to use it. Otherwise omit --builder.
+    BUILDX_BUILDER_ARG=""
+    if docker buildx inspect spatialvid-builder >/dev/null 2>&1; then
+      BUILDX_BUILDER_ARG="--builder spatialvid-builder"
+    fi
+
+    DOCKER_BUILDKIT=1 docker buildx build ${BUILDX_BUILDER_ARG} --load --progress=plain \
+      --cache-to type=local,dest=.buildx-cache --cache-from type=local,src=.buildx-cache \
+      --build-arg NUM_JOBS=${NUM_JOBS} -f Dockerfile -t ${IMAGE_TAG} .
   else
-    DOCKER_BUILDKIT=1 docker build --progress=plain -f Dockerfile.gpu -t ${IMAGE_TAG} .
+  DOCKER_BUILDKIT=1 docker build --progress=plain --build-arg NUM_JOBS=${NUM_JOBS} -f Dockerfile -t ${IMAGE_TAG} .
   fi
 else
   echo "docker buildx not detected — falling back to classic docker build"
-  docker build -f Dockerfile.gpu -t ${IMAGE_TAG} .
+  docker build --build-arg NUM_JOBS=${NUM_JOBS} -f Dockerfile -t ${IMAGE_TAG} .
 fi
 
 echo "[4/6] Checking ffmpeg version inside built image"
@@ -110,7 +157,7 @@ except Exception as e:
     print('torch not importable:', e)
 " || true
 
-echo "Done. If any step printed warnings or errors, inspect build output above and adjust Dockerfile.gpu (e.g., NV_CODEC_HEADERS_BRANCH, missing -dev packages)."
+echo "Done. If any step printed warnings or errors, inspect build output above and adjust Dockerfile (e.g., NV_CODEC_HEADERS_BRANCH, missing -dev packages)."
 
 echo "Helpful next commands:"
 echo "  docker images | grep spatialvid"
