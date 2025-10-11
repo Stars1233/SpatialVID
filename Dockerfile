@@ -66,15 +66,15 @@ RUN set -eux; \
 ARG NV_CODEC_HEADERS_BRANCH=sdk/12.1
 RUN set -eux; \
         # Use shallow clone to reduce download time and size; fallback to full clone if branch not available
-        if ! git clone --depth 1 --branch "${NV_CODEC_HEADERS_BRANCH}" https://githubfast/FFmpeg/nv-codec-headers.git /workspace/build/nv-codec-headers; then \
-            git clone https://githubfast/FFmpeg/nv-codec-headers.git /workspace/build/nv-codec-headers; \
+        if ! git clone --depth 1 --branch "${NV_CODEC_HEADERS_BRANCH}" https://github/FFmpeg/nv-codec-headers.git /workspace/build/nv-codec-headers; then \
+            git clone https://github/FFmpeg/nv-codec-headers.git /workspace/build/nv-codec-headers; \
             cd /workspace/build/nv-codec-headers && git checkout "${NV_CODEC_HEADERS_BRANCH}"; \
         fi; \
         cd /workspace/build/nv-codec-headers && make install
 
 # Build libvmaf with CUDA support (split into steps so failures are clearer)
 RUN set -eux; \
-    git clone https://githubfast/Netflix/vmaf.git /workspace/build/vmaf; \
+    git clone https://github/Netflix/vmaf.git /workspace/build/vmaf; \
     cd /workspace/build/vmaf; \
     # git checkout v2.3.1 || true; \
         # Build with CUDA only if the CUDA driver library (libcuda) is available
@@ -100,7 +100,7 @@ RUN set -eux; \
         # debug: print pkg-config info for key libs
         pkg-config --modversion libass || true; \
         # pkg-config --modversion libfdk-aac 2>/dev/null || pkg-config --modversion libfdk_aac 2>/dev/null || true; \
-        git clone https://githubfast/FFmpeg/FFmpeg.git /workspace/build/FFmpeg; \
+        git clone https://github/FFmpeg/FFmpeg.git /workspace/build/FFmpeg; \
         cd /workspace/build/FFmpeg; \
         git checkout ${FFMPEG_TAG}; \
         # pkg-config --modversion libvmafng || true; \
