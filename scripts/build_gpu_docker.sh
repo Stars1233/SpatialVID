@@ -58,8 +58,10 @@ IMAGE_TAG="spatialvid-gpu:latest"
 
 echo "[3/6] Building GPU image with Dockerfile (this may take a long time)..."
 # Pre-pull base images used by Dockerfile to fail early on network/auth issues
-BUILDER_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04" # cuda:12.1.0-cudnn8-devel-ubuntu22.04
-RUNTIME_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-runtime-ubuntu22.04" # cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+# BUILDER_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04" # cuda:12.1.0-cudnn8-devel-ubuntu22.04
+# RUNTIME_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-runtime-ubuntu22.04" # cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+BUILDER_IMAGE="cuda:12.1.0-cudnn8-devel-ubuntu22.04"
+RUNTIME_IMAGE="cuda:12.1.1-cudnn8-runtime-ubuntu22.04"
 
 echo "Pre-pulling base images to validate network/auth and warm cache:"
 retry_pull() {
@@ -87,7 +89,8 @@ USE_BUILDX_CACHE=${USE_BUILDX_CACHE:-1}
 if docker buildx version >/dev/null 2>&1; then
   echo "docker buildx detected — using BuildKit for build"
   # Optional: allow overriding the BuildKit image used by the docker-container driver
-  BUILDKIT_IMAGE="${BUILDKIT_IMAGE:-swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/moby/buildkit:buildx-stable-1}" # moby/buildkit:buildx-stable-1
+  BUILDKIT_IMAGE="${BUILDKIT_IMAGE:-moby/buildkit:buildx-stable-1}" # moby/buildkit:buildx-stable-1
+  # BUILDKIT_IMAGE="${BUILDKIT_IMAGE:-swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/moby/buildkit:buildx-stable-1}" # moby/buildkit:buildx-stable-1
 
   # If cache is requested, try to create/use a docker-container builder that can
   # use a custom BuildKit image (useful when Docker Hub is blocked and you have a private mirror).
