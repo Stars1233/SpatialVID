@@ -2,10 +2,11 @@
 # It uses a two-stage build to create a smaller runtime image
 # This file is adapted from https://github.com/Netflix/vmaf/blob/master/Dockerfile.cuda
 
-# ARG CUDA_BASE_IMAGE=docker.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
-# ARG RUN_TIME_IMG=docker.io/nvidia/cuda:12.6.3-runtime-ubuntu22.04
-ARG CUDA_BASE_IMAGE=swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
-ARG RUN_TIME_IMG=swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-runtime-ubuntu22.04
+ARG CUDA_BASE_IMAGE=docker.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
+ARG RUN_TIME_IMG=docker.io/nvidia/cuda:12.6.3-runtime-ubuntu22.04
+# ARG CUDA_BASE_IMAGE=swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
+# ARG RUN_TIME_IMG=swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-runtime-ubuntu22.04
+
 FROM $CUDA_BASE_IMAGE as builder
 
 
