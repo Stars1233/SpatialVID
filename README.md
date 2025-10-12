@@ -36,6 +36,7 @@
 </p>
 
 ## 🎉NEWS
++ [2025.10.11] 🐳 Docker support is now available, featuring a pre-configured environment with NVIDIA GPU-accelerated FFmpeg.
 + [2025.09.29] 🚀 Depth data for the SpatialVID-HQ dataset is now officially available.
 + [2025.09.24] 🤗 Raw metadata access is now available via a [gated HuggingFace dataset](https://huggingface.co/datasets/SpatialVID/SpatialVID-RAW) to better support community research!!
 + [2025.09.24] 🔭 Enhanced instructions for better camera control are updated.
@@ -171,6 +172,10 @@ The whole pipeline is illustrated in the figure below:
 
 We provide a Dockerfile to create a fully configured environment that includes all dependencies, including a custom-built FFmpeg with NVIDIA acceleration. This is the recommended way to ensure reproducibility and avoid environment-related issues.
 
+Before you begin, ensure your system environment is similar to the configuration below. Version matching is crucial for a successful compilation.
+The GPU needs to support HEVC; refer to the [NVIDIA NVDEC Support Matrix](https://en.wikipedia.org/wiki/NVIDIA_Video_Coding_Engine#NVDEC).
+
+
 ### Prerequisites: Setting up the Host Environment
 
 Before building and running the Docker container, your host machine must be configured to support GPU access for Docker.
@@ -180,7 +185,7 @@ Before building and running the Docker container, your host machine must be conf
 2.  **Docker Engine**: Install Docker on your system. Follow the official instructions at [docs.docker.com/engine/install/](https://docs.docker.com/engine/install/).
 
 3.  **NVIDIA Container Toolkit**: This toolkit allows Docker containers to access the host's NVIDIA GPU. Install it using the following commands (for Debian/Ubuntu):
-
+    To run docker containers with GPU support you have to install the [nvidia container toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). 
     ```bash
     # Add the GPG key
     curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
@@ -191,48 +196,29 @@ Before building and running the Docker container, your host machine must be conf
       sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
     
     # Update package lists and install the toolkit
-    sudo apt-get update
-    sudo apt-get install -y nvidia-container-toolkit
-    
+    sudo apt-get install -y \
+      nvidia-container-toolkit=${NVIDIA_CONTAINER_TOOLKIT_VERSION} \
+      nvidia-container-toolkit-base=${NVIDIA_CONTAINER_TOOLKIT_VERSION} \
+      libnvidia-container-tools=${NVIDIA_CONTAINER_TOOLKIT_VERSION} \
+      libnvidia-container1=${NVIDIA_CONTAINER_TOOLKIT_VERSION}
+
     # Configure Docker to use the NVIDIA runtime
-    sudo nvidia-ctk runtime configure --runtime=docker
+    sudo nvidia-ctk runtime configure --runtime=containerd
     
     # Restart the Docker daemon to apply the changes
-    sudo systemctl restart docker
+    sudo systemctl restart containerd
     ```
     For other operating systems, please refer to the [official NVIDIA documentation](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 
 ### Build and Run the Container
 
-Once the prerequisites are met, you can build and run the container using one of the following options.
-
-#### Option 1: Using the Helper Script
-
-We provide a convenient script to build the Docker image.
-
-1.  **Build the image**:
-    ```bash
-    # The --num-jobs argument specifies the number of parallel jobs for compilation. 
-    # Adjust it based on your machine's CPU cores.
-    bash scripts/build_gpu_docker.sh --num-jobs 8
-    ```
-
-2.  **Run the container**:
-    ```bash
-    # This command starts an interactive session inside the container,
-    # with the project directory mounted at /workspace.
-    docker run --gpus all --rm -it -v $(pwd):/workspace -w /workspace spatialvid:gpu-local bash
-    ```
-
-#### Option 2: Manual Build and Run
-
 You can also build and run the image using standard Docker commands from the root of the repository.
 
 1.  **Build the GPU image**:
     ```bash
-    docker build -f Dockerfile.gpu \
+    docker build -f Dockerfile.cuda \
       --build-arg NUM_JOBS=8 \
-      -t spatialvid:gpu:latest .
+      -t spatialvid-gpu .
     ```
 
 2.  **Run the container**:
@@ -240,7 +226,8 @@ You can also build and run the image using standard Docker commands from the roo
     docker run --gpus all --rm -it \
       -v $(pwd):/workspace \
       -w /workspace \
-      spatialvid:gpu:latest bash
+      -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility \
+      spatialvid-gpu bash
     ```
 
 3.  **Verify the environment (inside the container)**:
