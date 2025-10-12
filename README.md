@@ -210,6 +210,12 @@ Before building and running the Docker container, your host machine must be conf
     ```
     For other operating systems, please refer to the [official NVIDIA documentation](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 
+4. **Docker Image Pre-pulls [optional]**: To accelerate the build process, we provide a script to pre-pull necessary Docker images from a mirror registry.
+
+   ```bash
+   bash scripts/build_gpu_docker.sh
+   ```
+
 ### Build and Run the Container
 
 You can also build and run the image using standard Docker commands from the root of the repository.
