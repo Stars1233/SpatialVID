@@ -21,220 +21,154 @@ The GPU needs to support HEVC; refer to the [NVIDIA NVDEC Support Matrix](https:
 
 Please follow these steps in order.
 
+
 ### Step 1: Install System Dependencies
 
+Update system packages and install required development tools and libraries:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y \
-    build-essential yasm nasm cmake libtool libc6-dev unzip wget git pkg-config \
-    python3 python3-pip ninja-build ca-certificates libnuma-dev \
-    libx264-dev libx265-dev libvpx-dev libfdk-aac-dev libmp3lame-dev libopus-dev \
-    libass-dev libssl-dev
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    libopenjp2-7-dev \
+    ninja-build \
+    cmake \
+    git \
+    python3 \
+    python3-pip \
+    nasm \
+    xxd \
+    pkg-config \
+    curl \
+    unzip \
+    ca-certificates \
+    libnuma-dev \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libgl1 \
+    vim \
+    nvidia-cuda-toolkit
 ```
-**Note**: The command above installs the development packages for common audio/video codecs like `libx264`, `libx265`, `libvpx` (VP8/VP9), and `libfdk-aac` (AAC), which allows them to be enabled in FFmpeg.
 
-### Step 2: Install Meson
 
-`libvmaf` uses `Meson` and `Ninja` for its build process. We already installed `ninja-build` via `apt` in the previous step. Now, we'll use `pip` to install a newer version of `Meson`.
-
-1.  **Install Meson using pip**
-
-    ```bash
-    sudo python3 -m pip install --upgrade pip setuptools wheel
-    sudo python3 -m pip install --upgrade 'meson>=0.56.1'
-    ```
-
-2.  **Verify the version and handle path issues**
-    `libvmaf` requires Meson version ≥ 0.56.1.
-
-    ```bash
-    meson --version
-    ```
-
-    If the version is too low or the command is not found, it's likely because the newly installed executable is not in your system's `PATH`.
-
-    ```bash
-    # Find where meson was installed
-    which meson
-    # The output is usually /usr/local/bin/meson
-
-    # Add its path to your environment (for the current session)
-    export PATH="/usr/local/bin:$PATH"
-
-    # Add it permanently to your ~/.bashrc
-    echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
-    source ~/.bashrc
-    ```
-
-### Step 3: Install NVIDIA Codec Headers
-
-These are the header files FFmpeg needs to interface with the NVIDIA driver for hardware-accelerated video processing.
-
-1.  **Clone the repository**
-
-    ```bash
-    git clone https://github.com/FFmpeg/nv-codec-headers.git
-    cd nv-codec-headers
-    ```
-
-2.  **Check out the branch that matches your CUDA Toolkit**
-    Since the highest available version of this library is currently 12.2, we will use the `sdk/12.1` branch here.
-
-    ```bash
-    git checkout sdk/12.1
-    ```
-
-3.  **Install the headers**
-
-    ```bash
-    sudo make install
-    cd ..
-    ```
-
-### Step 4: Compile and Install VMAF (libvmaf)
-
-To use the `libvmaf_cuda` filter in FFmpeg, we must first compile `libvmaf` from source with CUDA support enabled. This will use the latest version from the main branch.
-
-1.  **Clone the VMAF repository**
-
-    ```bash
-    git clone https://github.com/Netflix/vmaf.git
-    cd vmaf
-    ```
-
-2.  **Configure the project with Meson**
-    Use the `meson setup` command to configure the build options, making sure to enable CUDA.
-
-    **IMPORTANT**: If you have had a failed compilation attempt before, make sure to clean up the old build directory (`rm -rf libvmaf/build`). Ensure that the CUDA paths below point correctly to your CUDA 12.6 installation (the default `/usr/local/cuda` is usually a symlink to the correct version).
-
-    Using the following command, which explicitly specifies CUDA paths, is highly recommended:
-
-    ```bash
-    meson setup libvmaf/build libvmaf \
-        --buildtype=release \
-        -Denable_cuda=true \
-        -Dcuda_include_dir=/usr/local/cuda/include \
-        -Dcuda_lib_dir=/usr/local/cuda/lib64 \
-        -Dcuda_compiler=/usr/local/cuda/bin/nvcc
-    ```
-
-3.  **Compile and install**
-
-    ```bash
-    # Compile
-    ninja -C libvmaf/build
-    # Install
-    sudo ninja -C libvmaf/build install
-    ```
-
-4.  **Refresh the dynamic library cache**
-    This crucial step ensures the system can find the newly installed `libvmaf.so`.
-
-    ```bash
-    sudo ldconfig
-    cd ..
-    ```
-
-### Step 5: Compile and Install FFmpeg
-
-With all dependencies in place, we can now compile FFmpeg itself.
-
-1.  **Clone the FFmpeg repository**
-
-    ```bash
-    git clone https://github.com/FFmpeg/FFmpeg.git
-    cd FFmpeg
-    ```
-
-2.  **Check out the target version**
-
-    ```bash
-    git checkout release/6.1
-    ```
-
-3.  **Configure the build**
-    This command configures FFmpeg to enable NVIDIA features, `libvmaf`, and the other third-party libraries we installed in Step 1. Ensure that the CUDA paths below point correctly to your CUDA 12.6 installation.
-
-    ```bash
-    ./configure \
-        --enable-nonfree \
-        --enable-gpl \
-        --enable-cuda-nvcc \
-        --enable-libnpp \
-        --extra-cflags="-I/usr/local/cuda/include -I/usr/local/cuda/include -I/usr/local/include" \
-        --extra-ldflags="-L/usr/local/cuda/lib64 -L/usr/local/cuda/compat" \
-        --disable-static \
-        --enable-shared \
-        --enable-libvmaf \
-        --enable-libx265 \
-    ```
-
-4.  **Compile and install**
-    Use the `j` flag to parallelize the compilation and speed it up (e.g., using `8` cores).
-
-    ```bash
-    make -j8
-    sudo make install
-    ```
-
-5.  **Refresh the dynamic library cache again**
-    This allows the system to recognize the newly installed FFmpeg libraries.
-
-    ```bash
-    sudo ldconfig
-    ```
-
-## Verify the Installation
-
-After installation, you can run these commands to confirm that FFmpeg was built correctly.
-
-1.  **Check version and configuration flags**
-
-    ```bash
-    ffmpeg -version
-    ```
-
-    The output should include the flags you enabled, such as `--enable-cuda-nvcc`, `--enable-libnpp`, `--enable-libvmaf`, and `--enable-libx264`.
-
-2.  **Check for available hardware accelerators**
-
-    ```bash
-    ffmpeg -hwaccels
-    ```
-
-    The list should include `cuda`.
-
-3.  **Check for NVIDIA and other encoders**
-
-    ```bash
-    # Check for NVIDIA encoders
-    ffmpeg -encoders | grep nvenc
-    # You should see encoders like h264_nvenc, hevc_nvenc, etc.
-
-    # Check for the libx264 encoder
-    ffmpeg -encoders | grep libx264
-    # You should see libx264
-
-    # Check for the libfdk_aac encoder
-    ffmpeg -encoders | grep libfdk_aac
-    # You should see libfdk_aac
-    ```
-
-## Usage Example
-
-This command demonstrates how to use hardware acceleration (`scale_npp`) and the CUDA-based VMAF filter to assess video quality.
+### Step 2: Clone Required Repositories
 
 ```bash
-ffmpeg -hwaccel cuda -hwaccel_output_format cuda -i distorted_video.mp4 -i reference_video.mp4 \
--filter_complex \
-"[0:v]scale_npp=format=yuv420p[dis];[1:v]scale_npp=format=yuv420p[ref];[dis][ref]libvmaf_cuda" \
--f null -
+# Create a working directory (custom path allowed)
+mkdir -p ~/ffmpeg-build && cd ~/ffmpeg-build
+
+# Clone nv-codec-headers (NVIDIA codec headers)
+git clone https://github.com/FFmpeg/nv-codec-headers.git
+
+# Clone libvmaf (video quality assessment library)
+git clone https://github.com/Netflix/vmaf.git
+cd vmaf && git checkout master  # Switch to master branch (modify version if needed)
+cd ..
+
+# Clone FFmpeg source code
+git clone https://github.com/FFmpeg/FFmpeg.git
+cd FFmpeg && git checkout master  # Switch to master branch (modify version if needed)
+cd ..
 ```
 
--   `-hwaccel cuda`: Enables CUDA hardware decoding.
--   `scale_npp`: Uses the NVIDIA NPP library for GPU-accelerated video scaling.
--   `libvmaf_cuda`: Uses the CUDA-based VMAF filter for calculations.
+
+### Step 3: Install nv-codec-headers
+
+```bash
+cd nv-codec-headers
+make
+sudo make install
+cd ..
+```
+
+
+### Step 4: Compile and Install libvmaf (with CUDA Support)
+
+1. Install the meson build tool:
+   ```bash
+   python3 -m pip install meson
+   ```
+
+2. Compile and install libvmaf:
+   ```bash
+   cd vmaf
+   meson libvmaf/build libvmaf \
+     -Denable_cuda=true \
+     -Denable_avx512=true \
+     --buildtype release
+   ninja -vC libvmaf/build
+   sudo ninja -vC libvmaf/build install
+   cd ..
+   ```
+
+3. Update system library cache:
+   ```bash
+   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/x86_64-linux-gnu/
+   sudo ldconfig
+   ```
+
+
+### Step 5: Compile and Install FFmpeg (with NVIDIA and libvmaf Support)
+
+```bash
+cd FFmpeg
+
+# Configure compilation options (enable CUDA, NVENC, NVDEC, and libvmaf)
+./configure \
+  --enable-libnpp \
+  --enable-nonfree \
+  --enable-nvdec \
+  --enable-nvenc \
+  --enable-cuvid \
+  --enable-cuda \
+  --enable-cuda-nvcc \
+  --enable-libvmaf \
+  --enable-ffnvcodec \
+  --disable-stripping \
+  --extra-cflags="-I/usr/local/cuda/include" \
+  --extra-ldflags="-L/usr/local/cuda/lib64 -L/usr/local/cuda/lib64/stubs/"
+
+# Compile (adjust the number after -j based on CPU cores for faster compilation)
+make -j$(nproc)
+
+# Install
+sudo make install
+
+cd ..
+```
+
+
+### Step 6: Configure Python Environment
+
+1. Upgrade pip and set up links:
+   ```bash
+   sudo ln -sf /usr/bin/python3 /usr/bin/python
+   python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+   ```
+
+2. Install Python dependencies (assuming project code is cloned locally; replace with actual path):
+   ```bash
+   # Navigate to the project root directory
+   cd /path/to/your/project
+
+   # Install dependencies
+   python3 -m pip --no-cache-dir install -r requirements/requirements.txt
+   python3 -m pip --no-cache-dir install -r requirements/requirements_scoring.txt || true
+   python3 -m pip --no-cache-dir install -r requirements/requirements_annotation.txt || true
+   ```
+
+
+### Step 7: Verify Installation
+
+1. Check FFmpeg version and configuration:
+   ```bash
+   ffmpeg -version
+   ffmpeg -encoders | grep nvenc  # Verify NVENC support
+   ffmpeg -decoders | grep nvdec  # Verify NVDEC support
+   ffmpeg -filters | grep vmaf    # Verify libvmaf support
+   ```
+
+2. If all the above commands output corresponding content correctly, the installation is successful.
 
 ## Troubleshooting
 
