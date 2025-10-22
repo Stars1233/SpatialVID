@@ -80,9 +80,6 @@ class ImageDataset(Dataset):
         def inner_func(idx):
             img_path = self.img_list[idx]
             raw_image = cv2.imread(img_path)
-            height, width = raw_image.shape[:2]
-            if height != 720 or width != 1280:
-                raise ValueError(f"Image size is not 720x1280, but {height}x{width}")
 
             image, (original_h, original_w) = self.image2tensor(raw_image)
 
