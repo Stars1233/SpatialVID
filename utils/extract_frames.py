@@ -60,6 +60,8 @@ def process_single_row(row, row_index, args):
     # Calculate frame extraction interval
     if args.interval is None:
         interval = row["num_frames"] // 3  # Extract 3 frames by default
+    elif args.interval == 0:
+        interval = 1  # Extract every frame
     else:
         interval = int(args.interval * row["fps"])
 
@@ -95,7 +97,7 @@ def parse_args():
         "--interval",
         type=float,
         default=0.2,
-        help="Frame extraction interval in seconds",
+        help="Frame extraction interval in seconds (set to 0 to extract every frame)",
     )
     parser.add_argument(
         "--target_size",
