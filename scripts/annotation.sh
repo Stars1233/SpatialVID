@@ -72,6 +72,7 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 4.2 python camera_pose
   --dir_path ${OUTPUT_DIR} \
   --gpu_id ${CUDA_VISIBLE_DEVICES} \
   --num_workers $((GPU_NUM * 2))
+  # --only_depth
 
 # 5. Dynamic Mask Prediction
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 5 python camera_pose_annotation/dynamic_mask/inference_batch.py \
