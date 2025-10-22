@@ -36,8 +36,6 @@ class ImageDataset(Dataset):
             rgb = np.array(Image.open(img_path))[..., :3]
 
             h, w = rgb.shape[:2]
-            if h != 720 or w != 1280:
-                raise ValueError(f"Image size is not 720x1280, but {h}x{w}")
 
             # Calculate target size maintaining aspect ratio
             if w > h:
