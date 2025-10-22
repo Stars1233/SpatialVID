@@ -31,6 +31,7 @@ measure_time 1 python utils/extract_frames.py \
   --csv_path ${CSV} \
   --output_dir ${OUTPUT_DIR} \
   --num_workers $((GPU_NUM * 2)) \
+  --target_size "1280*720" \
   --interval 0.2
 
 # 2.1 Depth Estimation with Depth-Anything
