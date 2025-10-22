@@ -94,7 +94,7 @@ def parse_args():
     parser.add_argument(
         "--interval",
         type=float,
-        default=None,
+        default=0.2,
         help="Frame extraction interval in seconds",
     )
     parser.add_argument(
