@@ -17,7 +17,7 @@ def main():
     parser.add_argument(
         "--type",
         type=str,
-        choices=["videos", "annotations", "metadata", "all"],
+        choices=["videos", "annotations", "depths", "metadata", "all"],
         required=True,
         help="Type of data to download (videos, annotations, metadata, all)",
     )
