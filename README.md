@@ -43,10 +43,13 @@
 + [2025.09.18] 🎆 SpatialVID dataset is now available on both HuggingFace and ModelScope.
 + [2025.09.14] 📢 We have also uploaded the SpatialVID-HQ dataset to ModelScope offering more diverse download options.
 + [2025.09.11] 🔥 Our paper, code and SpatialVID-HQ dataset are released!
+  
+**[✍️ Note]** Each video clip is paired with a dedicated annotation folder (named after the video’s id). The folder contains 5 key files, and details regarding these files can be found in [Detailed Explanation of Annotation Files](https://huggingface.co/datasets/SpatialVID/SpatialVID#3-detailed-explanation-of-annotation-files).
 
 ## Abstract
 
 Significant progress has been made in spatial intelligence, spanning both spatial reconstruction and world exploration. However, the scalability and real-world fidelity of current models remain severely constrained by the scarcity of large-scale, high-quality training data. While several datasets provide camera pose information, they are typically limited in scale, diversity, and annotation richness, particularly for real-world dynamic scenes with ground-truth camera motion. To this end, we collect **SpatialVID**, a dataset consisting of a large corpus of in-the-wild videos with diverse scenes, camera movements and dense 3D annotations such as per-frame camera poses, depth, and motion instructions. Specifically, we collect more than **21,000 hours** of raw videos, and process them into **2.7 million clips** through a hierarchical filtering pipeline, totaling **7,089 hours** of dynamic content. A subsequent annotation pipeline enriches these clips with detailed spatial and semantic information, including camera poses, depth maps, dynamic masks, structured captions, and serialized motion instructions. Analysis of SpatialVID's data statistics reveals a richness and diversity that directly foster improved model generalization and performance, establishing it as a key asset for the video and 3D vision research community.
+
 
 ## Preparation
 
