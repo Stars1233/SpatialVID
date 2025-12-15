@@ -1,7 +1,7 @@
 <h1 align='center'>SpatialVID: A Large-Scale Video Dataset with Spatial Annotations</h1>
 <div align='center'>
     <a href='https://oiiiwjh.github.io/' target='_blank'>Jiahao Wang</a><sup>1*</sup> 
-    <a href='https://github.com/FelixYuan-YF' target='_blank'>Yufeng Yuan</a><sup>1*</sup> 
+    <a href='https://felixyuan-yf.io/' target='_blank'>Yufeng Yuan</a><sup>1*</sup> 
     <a href='https://zrj-cn.github.io/' target='_blank'>Rujie Zheng</a><sup>1*</sup> 
     <a href='https://linyou.github.io' target='_blank'>Youtian Lin</a><sup>1</sup> 
     <a href='https://ygaojiany.github.io' target='_blank'>Jian Gao</a><sup>1</sup> 
@@ -271,13 +271,10 @@ Our repository is licensed under the Apache 2.0 License. However, if you use Meg
 ## Citation
 
 ```bibtex
-@misc{wang2025spatialvidlargescalevideodataset,
-      title={SpatialVID: A Large-Scale Video Dataset with Spatial Annotations}, 
-      author={Jiahao Wang and Yufeng Yuan and Rujie Zheng and Youtian Lin and Jian Gao and Lin-Zhuo Chen and Yajie Bao and Yi Zhang and Chang Zeng and Yanxi Zhou and Xiaoxiao Long and Hao Zhu and Zhaoxiang Zhang and Xun Cao and Yao Yao},
-      year={2025},
-      eprint={2509.09676},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2509.09676}, 
+@article{wang2025spatialvid,
+  title={Spatialvid: A large-scale video dataset with spatial annotations},
+  author={Wang, Jiahao and Yuan, Yufeng and Zheng, Rujie and Lin, Youtian and Gao, Jian and Chen, Lin-Zhuo and Bao, Yajie and Zhang, Yi and Zeng, Chang and Zhou, Yanxi and others},
+  journal={arXiv preprint arXiv:2509.09676},
+  year={2025}
 }
 ```
