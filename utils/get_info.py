@@ -6,9 +6,8 @@ import argparse
 import os
 import random
 import queue
-from glob import glob
-import sys
 import cv2
+import av
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -48,8 +47,6 @@ def get_video_info(args):
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             cap.release()
         elif backend == "av":
-            import av
-
             container = av.open(path)
             stream = container.streams.video[0]
             num_frames = int(stream.frames)

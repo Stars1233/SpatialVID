@@ -46,12 +46,14 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 1.1 python utils/conve
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 1.2 python utils/get_info.py \
   --csv_path ${ROOT_META}/meta.csv \
   --csv_save_path ${ROOT_META}/meta_info.csv \
+  --backend "opencv" \
   --num_workers 16
 
 # 2.1 Detect scenes. This should output ${ROOT_META}/meta_info_fmin${fmin_1}_timestamp.csv
 # Also, you can set the params like "--start-remove-sec 0.5 --end-remove-sec 0.5"
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 2.1 python utils/scene_detect.py \
   --csv_path ${ROOT_META}/meta_info.csv \
+  --backend "opencv" \
   --num_workers 64 \
   --frame_skip 2\
   --start_remove_sec 0.3 \
@@ -70,7 +72,8 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 2.3 python utils/extra
   --csv_path ${ROOT_META}/clips_info.csv \
   --output_dir ${ROOT_FIG} \
   --num_workers 64 \
-  --target_size "640*360"
+  --target_size "640*360" \
+  --backend "opencv"
 
 # 3.1 Predict aesthetic scores. This should output ${ROOT_META}/clips_info_aes.csv
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 3.1 torchrun --nproc_per_node ${GPU_NUM} scoring/aesthetic/inference.py \

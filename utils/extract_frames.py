@@ -5,6 +5,7 @@ Video frame extraction utility with parallel processing support.
 import os
 import sys
 import cv2
+import av
 import argparse
 import pandas as pd
 import queue
@@ -13,7 +14,7 @@ from multiprocessing import Manager
 from tqdm import tqdm
 
 
-def extract_frames(
+def extract_frames_opencv(
     video_path, output_dir, interval, frame_start, num_frames, target_size=None
 ):
     """Extract frames from video at specified intervals"""
@@ -45,6 +46,66 @@ def extract_frames(
     cap.release()
 
 
+def extract_frames_av(
+    video_path, output_dir, interval, frame_start, num_frames, target_size=None
+):
+    """
+    Extract frames from video at specified intervals using PyAV backend.
+    """
+    # Create output directory
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    try:
+        # Open video file
+        container = av.open(video_path)
+        stream = container.streams.video[0]
+        stream.thread_type = 'AUTO'
+    except Exception as e:
+        print(f"Error: Could not open video file {video_path}. Reason: {e}")
+        return
+
+    # Get video properties
+    fps = float(stream.average_rate)
+    time_base = stream.time_base
+   
+    target_sec = frame_start / fps
+    # Set a small tolerance (e.g., half a frame time) to prevent frame loss due to floating-point precision issues
+    epsilon = 0.5 / fps 
+
+    # Seek to the target start time
+    if frame_start > 0:
+        target_pts = int(target_sec / time_base)
+        container.seek(target_pts, stream=stream, backward=True)
+
+    count = 0
+    for frame in container.decode(stream):
+        if frame.pts is None:
+            continue
+            
+        current_sec = frame.pts * time_base
+        if current_sec < (target_sec - epsilon):
+            continue
+
+        if count >= num_frames:
+            break
+        
+        # Save frame at specified intervals
+        if count % interval == 0:
+            image = frame.to_ndarray(format='bgr24')
+            frame_filename = os.path.join(output_dir, f"frame_{count:06d}.jpg")
+            if target_size is not None:
+                if isinstance(target_size, str):
+                     w, h = map(int, target_size.split('*'))
+                     target_size = (w, h)
+                image = cv2.resize(image, target_size)
+            cv2.imwrite(frame_filename, image)
+
+        count += 1
+
+    container.close()
+
+
 def process_single_row(row, row_index, args):
     """Process a single video row to extract frames"""
     video_path = row["video_path"]
@@ -65,9 +126,14 @@ def process_single_row(row, row_index, args):
     else:
         interval = int(args.interval * row["fps"])
 
-    extract_frames(
-        video_path, output_dir, interval, frame_start, num_frames, args.target_size
-    )
+    if args.backend == "opencv":
+        extract_frames_opencv(
+            video_path, output_dir, interval, frame_start, num_frames, args.target_size
+        )
+    elif args.backend == "av":
+        extract_frames_av(
+            video_path, output_dir, interval, frame_start, num_frames, args.target_size
+        )
 
 
 def worker(task_queue, args):
@@ -107,6 +173,13 @@ def parse_args():
     )
     parser.add_argument(
         "--num_workers", type=int, default=None, help="Number of parallel workers"
+    )
+    parser.add_argument(
+        "--backend",
+        type=str,
+        default="opencv",
+        choices=["opencv", "av"],
+        help="Backend for video reading",
     )
     parser.add_argument(
         "--disable_parallel", action="store_true", help="Disable parallel processing"

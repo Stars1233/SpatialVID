@@ -77,12 +77,16 @@ This section describes how to set up the environment manually. For a simpler, co
 
    About FFMPEG, please refer to the [`INSTALL.md`](scoring/motion/INSTALL.md) for detailed instructions on how to install ffmpeg. After installation, replace the `FFMPEG_PATH` variable in the [`scoring/motion/inference.py`](scoring/motion/inference.py) and [`utils/cut.py`](utils/cut.py) with the actual path to your ffmpeg executable, default is `/usr/local/bin/ffmpeg`.
 
-   [Optional] if your videos are in av1 codec instead of h264, you need to install ffmpeg (already in our requirement script), then run the following to make conda support av1 codec:
+   ⚠️ If your videos are in av1 codec instead of h264, you need to install ffmpeg (already in our requirement script), then run the following to make conda support av1 codec:
 
    ```bash
    pip uninstall opencv-python
    conda install -c conda-forge opencv==4.11.0
    ```
+
+   If unfortunately your conda environment still cannot support av1 codec, you can use the `--backend av` option in the scoring scripts to use PyAV as the video reading backend.
+   But note that using PyAV for frame extraction may lead to slight inaccuracies in frame positioning.
+
 3. Package needed for annotation
 
    ```bash

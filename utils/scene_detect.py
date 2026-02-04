@@ -46,6 +46,7 @@ def process_single_row(
     end_remove_sec=0,
     min_seconds=2,
     max_seconds=15,
+    backend="opencv",
 ):
     """
     Process a single video file for scene detection.
@@ -62,7 +63,10 @@ def process_single_row(
             scene_manager = SceneManager()
             for i in detector:
                 scene_manager.add_detector(i)
-            video = open_video(video_path)
+            if backend == "opencv":
+                video = open_video(video_path)
+            elif backend == "av":
+                video = open_video(video_path, backend="pyav")
             # Get video frame rate
             fps = video.frame_rate
             scene_manager.detect_scenes(video=video, frame_skip=frame_skip)
@@ -139,6 +143,7 @@ def worker(task_queue, results_queue, args):
             end_remove_sec=args.end_remove_sec,
             min_seconds=args.min_seconds,
             max_seconds=args.max_seconds,
+            backend=args.backend,
         )
         results_queue.put((index, result))
         task_queue.task_done()
@@ -182,6 +187,13 @@ def parse_args():
         type=float,
         default=15,
         help="Maximum duration of a scene in seconds",
+    )
+    parser.add_argument(
+        "--backend",
+        type=str,
+        default="opencv",
+        choices=["opencv", "av"],
+        help="Backend for video reading",
     )
     parser.add_argument(
         "--disable_parallel", action="store_true", help="Disable parallel processing"

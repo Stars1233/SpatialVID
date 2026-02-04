@@ -24,7 +24,7 @@ def process_single_row(row, args, model):
     images = [cv2.imread(img_path) for img_path in img_list]
 
     result = model.predict(input=images)
-    area = row["height"] * row["width"]
+    area = images[0].shape[0] * images[0].shape[1]  # Image area
 
     area_list = []
     for res in result:
