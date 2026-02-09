@@ -76,7 +76,13 @@ def process_single_row(
             # Get video frame rate
             fps = video.frame_rate
             scene_list = detect(video_path, detector, start_in_scene=True)
-        timestamp = [(s.get_timecode(), t.get_timecode()) for s, t in scene_list]
+        
+        if not scene_list:
+            # If no scenes are detected, treat the entire video as one scene
+            video_duration = video.duration
+            timestamp = [("00:00:00.000", seconds_to_timecode(video_duration.get_seconds()))]
+        else:
+            timestamp = [(s.get_timecode(), t.get_timecode()) for s, t in scene_list]
 
         # Process timestamps: remove specified seconds from start/end, filter by duration
         new_timestamp = []
