@@ -23,6 +23,12 @@
 <div align='center'>
     <sup>1</sup>Nanjing University  <sup>2</sup>Institute of Automation, Chinese Academy of Science 
 </div>
+<div align='center'>
+    *Equal Contribution  †Corresponding Author
+</div>
+<div align="center">
+   <strong>CVPR 2026</strong>
+</div>
 <br>
 <div align="center">
   <a href="https://nju-3dv.github.io/projects/SpatialVID/"><img src="https://img.shields.io/static/v1?label=SpatialVID&message=Project&color=purple"></a>  
@@ -36,6 +42,7 @@
 </p>
 
 ## 🎉NEWS
++ [2026.02.21] 🎉 SpatialVID is accepted by CVPR 2026!
 + [2025.10.11] 🐳 Docker support is now available, featuring a pre-configured environment with NVIDIA GPU-accelerated FFmpeg.
 + [2025.09.29] 🚀 Depth data for the SpatialVID-HQ dataset is now officially available.
 + [2025.09.24] 🤗 Raw metadata access is now available via a [gated HuggingFace dataset](https://huggingface.co/datasets/SpatialVID/SpatialVID-RAW) to better support community research!!
