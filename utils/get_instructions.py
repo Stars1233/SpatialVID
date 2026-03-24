@@ -76,11 +76,14 @@ def poses_to_multi_instructions(poses_array, translation_thresh, rotation_thresh
     rotation_thresh_rad = np.deg2rad(rotation_thresh_deg)
 
     for i in range(len(poses) - 1):
-        pos_t, rot_t = poses[i]
-        pos_t1, rot_t1 = poses[i + 1]
         # Calculate local relative movement
-        delta_rot = rot_t1 * rot_t.inv()
-        local_delta_pos = rot_t.inv().apply(pos_t - pos_t1)
+        pos_t_w2c, rot_t_w2c = poses[i]
+        pos_t1_w2c, rot_t1_w2c = poses[i+1]
+        delta_rot = rot_t1_w2c * rot_t_w2c.inv()
+
+        pos_t_c2w = rot_t_w2c.inv().apply(pos_t_w2c)
+        pos_t1_c2w = rot_t1_w2c.inv().apply(pos_t1_w2c)
+        local_delta_pos = rot_t_w2c.inv().apply(pos_t1_c2w - pos_t_c2w)
 
         dx, dy, dz = local_delta_pos
         euler_angles_rad = delta_rot.as_euler(

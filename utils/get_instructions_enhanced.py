@@ -66,10 +66,13 @@ def poses_to_multi_instructions(poses_array, translation_thresh, rotation_thresh
             break
 
         # Calculate relative motion (local coordinate system)
-        pos_t, rot_t = poses[i]
-        pos_t1, rot_t1 = poses[i+interval]
-        delta_rot = rot_t1 * rot_t.inv()
-        local_delta_pos = rot_t.inv().apply(pos_t - pos_t1)  # Local frame translation
+        pos_t_w2c, rot_t_w2c = poses[i]
+        pos_t1_w2c, rot_t1_w2c = poses[i+interval]
+        delta_rot = rot_t1_w2c * rot_t_w2c.inv()
+
+        pos_t_c2w = rot_t_w2c.inv().apply(pos_t_w2c)
+        pos_t1_c2w = rot_t1_w2c.inv().apply(pos_t1_w2c)
+        local_delta_pos = rot_t_w2c.inv().apply(pos_t1_c2w - pos_t_c2w)
 
         dx, dy, dz = local_delta_pos
         yaw, pitch, roll = delta_rot.as_euler(
