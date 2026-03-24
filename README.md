@@ -262,9 +262,17 @@ You can also build and run the image using standard Docker commands from the roo
 
 ## Dataset Download
 
+Our dataset is available on [HuggingFace](https://huggingface.co/SpatialVID) and [ModelScope](https://www.modelscope.cn/organization/SpatialVID).
+
 Apart from downloading the dataset using terminal commands, we provide scripts to download the SpatialVID/SpatialVID-HQ dataset from HuggingFace. Please refer to the [`download_SpatialVID.py`](utils/download_SpatialVID.py) script for more details.
 
 We also provide our script to download the raw videos from YouTube. You can refer to the [`download_YouTube.py`](utils/download_YouTube.py) script for more details.
+
+## License
+
+Please refer to the [LICENSE](LICENSE) file for more details about the license of our code.
+
+⚠️ SpatialVID dataset is released under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode) (CC-BY-NC-SA-4.0). Users must attribute the original source, use the resource only for non-commercial purposes, and release any modified/derived works under the same license. If you are the copyright owner of any video in our dataset and you need it to be removed, please contact us, and we will remove the video samples from our dataset / Github / project webpage / technical presentation as soon as possible.
 
 ## References
 
