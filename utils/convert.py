@@ -1,5 +1,5 @@
 """
-Video file conversion utility for the SpatialVid project.
+Video file conversion utility for the SpatialVID project.
 
 This module provides functionality to scan directories for video files,
 process them, and generate CSV metadata files containing video information.

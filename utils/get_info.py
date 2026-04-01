@@ -5,7 +5,6 @@ Video information extraction utility supporting multiple backends (OpenCV, Torch
 import argparse
 import os
 import random
-import queue
 import cv2
 import av
 import numpy as np
@@ -38,6 +37,11 @@ def get_video_info(args):
                 vframes.shape[2],
                 vframes.shape[3],
             )
+            fps = (
+                float(infos.get("video_fps", np.nan))
+                if isinstance(infos, dict)
+                else np.nan
+            )
         elif backend == "opencv":
             cap = cv2.VideoCapture(path)
             if not cap.isOpened():
@@ -45,6 +49,7 @@ def get_video_info(args):
             num_frames = get_video_length(cap, method="header")
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            fps = float(cap.get(cv2.CAP_PROP_FPS))
             cap.release()
         elif backend == "av":
             container = av.open(path)
@@ -52,75 +57,61 @@ def get_video_info(args):
             num_frames = int(stream.frames)
             height = int(stream.height)
             width = int(stream.width)
+            if stream.average_rate is not None:
+                fps = float(stream.average_rate)
+            elif stream.guessed_rate is not None:
+                fps = float(stream.guessed_rate)
+            else:
+                fps = np.nan
         else:
             raise ValueError("Unknown backend")
 
         # Calculate derived metrics
         hw = height * width
         aspect_ratio = height / width if width > 0 else np.nan
-        return (idx, True, num_frames, height, width, aspect_ratio, hw)
-    except Exception as e:
-        return (idx, False, 0, 0, 0, np.nan, np.nan)
-
-
-def worker(task_queue, results_queue, args):
-    """Worker function for parallel video processing"""
-    while True:
-        try:
-            index, path, backend = task_queue.get(timeout=1)
-        except queue.Empty:
-            break
-        result = get_video_info((index, path, backend))
-        results_queue.put((index, result))
-        task_queue.task_done()
+        return (idx, True, num_frames, height, width, aspect_ratio, hw, fps)
+    except Exception:
+        return (idx, False, 0, 0, 0, np.nan, np.nan, np.nan)
 
 
 def main(args):
     """Main function to extract video information"""
     # Load data
     data = pd.read_csv(args.csv_path)
+    if data.empty:
+        data.to_csv(args.csv_save_path, index=False)
+        print(f"Input CSV is empty. Saved 0 samples to {args.csv_save_path}.")
+        return
 
-    # Setup multiprocessing
-    from multiprocessing import Manager
+    tasks = [(index, row["video_path"], args.backend) for index, row in data.iterrows()]
+    num_workers = args.num_workers if args.num_workers else os.cpu_count() or 1
 
-    manager = Manager()
-    task_queue = manager.Queue()
-    results_queue = manager.Queue()
-
-    for index, row in data.iterrows():
-        task_queue.put((index, row["video_path"], args.backend))
-
-    num_workers = args.num_workers if args.num_workers else os.cpu_count()
-
-    # Process videos in parallel
-    with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
-        futures = []
-        for _ in range(num_workers):
-            future = executor.submit(worker, task_queue, results_queue, args)
-            futures.append(future)
-
-        for future in tqdm(
-            concurrent.futures.as_completed(futures),
-            total=len(futures),
-            desc="Workers completing",
-        ):
-            future.result()
-
-    # Collect and process results
-    ret = []
-    while not results_queue.empty():
-        ret.append(results_queue.get())
+    # Process videos with a per-video progress bar (more intuitive than per-worker)
+    if args.disable_parallel or num_workers <= 1:
+        ret = [
+            get_video_info(task)
+            for task in tqdm(tasks, total=len(tasks), desc="Processing videos")
+        ]
+    else:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+            ret = list(
+                tqdm(
+                    executor.map(get_video_info, tasks, chunksize=16),
+                    total=len(tasks),
+                    desc="Processing videos",
+                )
+            )
 
     ret.sort(key=lambda x: x[0])
-    ret = [x[1] for x in ret]
     (
-        idx_list,
+        _idx_list,
         success_list,
         num_frames_list,
         height_list,
         width_list,
         aspect_ratio_list,
         hw_list,
+        fps_list,
     ) = zip(*ret)
 
     # Add extracted information to DataFrame
@@ -130,6 +121,7 @@ def main(args):
     data["width"] = width_list
     data["aspect_ratio"] = aspect_ratio_list
     data["resolution"] = hw_list
+    data["fps"] = fps_list
 
     # Filter existing files if requested
     if args.ext:

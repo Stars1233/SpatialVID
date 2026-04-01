@@ -26,7 +26,7 @@ def get_ffmpeg_acceleration():
             [FFMPEG_PATH, "-version"], stderr=subprocess.DEVNULL
         ).decode("utf-8")
 
-        if "--enable-cuda-nvcc" and "--enable-libvmaf" in output:  # NVIDIA GPU
+        if "--enable-cuda-nvcc" in output and "--enable-libvmaf" in output:
             return "nvidia"
         else:
             return "cpu"  # Use CPU
@@ -90,7 +90,7 @@ def calculate_score(row, args):
     return mean_value
 
 
-def worker1(task_queue, args, process_id):
+def worker1(task_queue, progress_queue, args, process_id):
     """Worker function for processing videos in parallel."""
     while True:
         try:
@@ -98,6 +98,7 @@ def worker1(task_queue, args, process_id):
         except queue.Empty:
             break
         process_single_row(video_path, args, process_id)
+        progress_queue.put(video_path)
         task_queue.task_done()
 
 
@@ -164,11 +165,12 @@ def main():
         if args.num_workers is not None:
             num_workers = args.num_workers
         else:
-            num_workers = os.cpu_count()
+            num_workers = os.cpu_count() or 1
 
         # First phase: process videos to generate CSV files
         manager = Manager()
         task_queue = manager.Queue()
+        progress_queue = manager.Queue()
 
         for video_path in video_paths:
             task_queue.put(video_path)
@@ -178,13 +180,23 @@ def main():
         ) as executor:
             futures = []
             for id in range(num_workers):
-                futures.append(executor.submit(worker1, task_queue, args, id))
+                futures.append(
+                    executor.submit(worker1, task_queue, progress_queue, args, id)
+                )
 
-            for future in tqdm(
-                concurrent.futures.as_completed(futures),
-                total=len(futures),
-                desc="Finished workers",
-            ):
+            processed = 0
+            total_video_tasks = len(video_paths)
+            with tqdm(total=total_video_tasks, desc="Processing videos") as pbar:
+                while processed < total_video_tasks:
+                    try:
+                        progress_queue.get(timeout=1)
+                        processed += 1
+                        pbar.update(1)
+                    except queue.Empty:
+                        if all(f.done() for f in futures) and progress_queue.empty():
+                            break
+
+            for future in futures:
                 future.result()
 
         # Second phase: calculate motion scores
@@ -201,15 +213,23 @@ def main():
             for _ in range(num_workers):
                 futures.append(executor.submit(worker2, task_queue, result_queue, args))
 
-            for future in tqdm(
-                concurrent.futures.as_completed(futures),
-                total=len(futures),
-                desc="Finished workers",
-            ):
+            results = []
+            processed = 0
+            total_score_tasks = len(df)
+            with tqdm(total=total_score_tasks, desc="Calculating scores") as pbar:
+                while processed < total_score_tasks:
+                    try:
+                        results.append(result_queue.get(timeout=1))
+                        processed += 1
+                        pbar.update(1)
+                    except queue.Empty:
+                        if all(f.done() for f in futures) and result_queue.empty():
+                            break
+
+            for future in futures:
                 future.result()
 
         # Collect and sort results
-        results = []
         while not result_queue.empty():
             results.append(result_queue.get())
         results.sort(key=lambda x: x[0])

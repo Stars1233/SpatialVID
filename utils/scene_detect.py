@@ -10,6 +10,7 @@ This module provides functionality for:
 
 import argparse
 import os
+import ast
 import concurrent.futures
 import queue
 import numpy as np
@@ -245,7 +246,7 @@ def main():
         if args.num_workers is not None:
             num_workers = args.num_workers
         else:
-            num_workers = os.cpu_count()
+            num_workers = os.cpu_count() or 1
 
         # Process videos in parallel
         with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
@@ -254,11 +255,19 @@ def main():
                 future = executor.submit(worker, task_queue, results_queue, args)
                 futures.append(future)
 
-            for future in tqdm(
-                concurrent.futures.as_completed(futures),
-                total=len(futures),
-                desc="Finished workers",
-            ):
+            processed = 0
+            total_tasks = len(csv)
+            with tqdm(total=total_tasks, desc="Processing videos") as pbar:
+                while processed < total_tasks:
+                    try:
+                        ret.append(results_queue.get(timeout=1))
+                        processed += 1
+                        pbar.update(1)
+                    except queue.Empty:
+                        if all(f.done() for f in futures) and results_queue.empty():
+                            break
+
+            for future in futures:
                 future.result()
 
         # Collect results
@@ -275,7 +284,7 @@ def main():
 
     def calculate_frame_numbers(row):
         """Calculate frame numbers from timestamps and fps."""
-        timestamp = eval(row["timestamp"])
+        timestamp = ast.literal_eval(row["timestamp"])
         fps = row["fps"]
         frame_numbers = [
             (timecode_to_frames(start, fps), timecode_to_frames(end, fps))

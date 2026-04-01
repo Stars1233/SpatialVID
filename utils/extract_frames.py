@@ -136,7 +136,7 @@ def process_single_row(row, row_index, args):
         )
 
 
-def worker(task_queue, args):
+def worker(task_queue, progress_queue, args):
     """Worker function for parallel frame extraction"""
     while True:
         try:
@@ -144,6 +144,7 @@ def worker(task_queue, args):
         except queue.Empty:
             break
         process_single_row(row, index, args)
+        progress_queue.put(index)
         task_queue.task_done()
 
 
@@ -210,10 +211,11 @@ def main():
             process_single_row(row, index, args)
     else:
         # Parallel processing
-        num_workers = args.num_workers if args.num_workers else os.cpu_count()
+        num_workers = args.num_workers if args.num_workers else os.cpu_count() or 1
 
         manager = Manager()
         task_queue = manager.Queue()
+        progress_queue = manager.Queue()
 
         # Add tasks to queue
         for index, row in csv.iterrows():
@@ -225,14 +227,22 @@ def main():
         ) as executor:
             futures = []
             for _ in range(num_workers):
-                future = executor.submit(worker, task_queue, args)
+                future = executor.submit(worker, task_queue, progress_queue, args)
                 futures.append(future)
 
-            for future in tqdm(
-                concurrent.futures.as_completed(futures),
-                total=len(futures),
-                desc="Workers completing",
-            ):
+            processed = 0
+            total_tasks = len(csv)
+            with tqdm(total=total_tasks, desc="Processing videos") as pbar:
+                while processed < total_tasks:
+                    try:
+                        progress_queue.get(timeout=1)
+                        processed += 1
+                        pbar.update(1)
+                    except queue.Empty:
+                        if all(f.done() for f in futures) and progress_queue.empty():
+                            break
+
+            for future in futures:
                 future.result()
 
 

@@ -1,7 +1,11 @@
 #!/bin/bash
-ROOT_VIDEO=[Replace with the path to your video files]
+VIDEO_DIR=[Replace with the path to your video files]
 OUTPUT_DIR=[Replace with the path to your output directory]
 mkdir -p ${OUTPUT_DIR}
+
+# Choose whether to cut the clips precisely based on the timestamps or to cut them fast based on keyframes.
+# The precise cutting will be slower but more accurate, while the fast cutting will be faster but may not be as accurate.
+FAST_CUT=False
 
 GPU_NUM=8
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
@@ -12,7 +16,7 @@ ROOT_META=${OUTPUT_DIR}/meta
 ROOT_FIG=${OUTPUT_DIR}/fig
 ROOT_TEMP=${OUTPUT_DIR}/temp
 
-for dir in ${ROOT_VIDEO} ${ROOT_CLIPS} ${ROOT_META} ${ROOT_FIG} ${ROOT_TEMP}; do
+for dir in ${ROOT_CLIPS} ${ROOT_META} ${ROOT_FIG} ${ROOT_TEMP}; do
     if [ ! -d ${dir} ]; then
         mkdir -p ${dir}
     fi
@@ -39,7 +43,7 @@ measure_time() {
 
 # 1.1 Create a meta file from a video folder. This should output ${ROOT_META}/meta.csv
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 1.1 python utils/convert.py \
-  --video_dir ${ROOT_VIDEO} \
+  --video_dir ${VIDEO_DIR} \
   --output ${ROOT_META}/meta.csv
 
 # 1.2 Get video information and remove broken videos. This should output ${ROOT_META}/meta_info_fmin${fmin_1}.csv
@@ -120,9 +124,19 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 5 python utils/filter.
   --ocr_max 0.3
 
 # 6 Cut the clips.
-CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 6 python utils/cut.py \
-  --csv_path ${ROOT_META}/filtered_clips.csv \
-  --csv_save_path ${OUTPUT_DIR}/results.csv \
-  --video_save_dir ${ROOT_CLIPS} \
-  --num_workers $((GPU_NUM * 4)) \
-  --gpu_num $GPU_NUM
+if [ "$FAST_CUT" = False ]; then
+    echo "Using precise cutting based on timestamps."
+    CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 6 python utils/cut.py \
+      --csv_path ${ROOT_META}/filtered_clips.csv \
+      --csv_save_path ${OUTPUT_DIR}/results.csv \
+      --video_save_dir ${ROOT_CLIPS} \
+      --num_workers $((GPU_NUM * 4)) \
+      --gpu_num $GPU_NUM
+else
+    echo "Using fast cutting based on keyframes."
+    CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 6 python utils/cut_fast.py \
+      --csv_path ${ROOT_META}/filtered_clips.csv \
+      --csv_save_path ${OUTPUT_DIR}/results.csv \
+      --video_save_dir ${ROOT_CLIPS} \
+      --num_workers $((GPU_NUM * 4))
+fi

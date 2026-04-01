@@ -153,7 +153,7 @@ def predict_mask(predictor, row, args, device):
             points = np.array(points)
 
             # Sample points from contour as prompts
-            interval = len(points) // 3
+            interval = max(1, len(points) // 3)
             input_points = points[::interval].astype(np.float32)
 
             # Skip if points are in sky region
@@ -182,7 +182,7 @@ def predict_mask(predictor, row, args, device):
     compress(masks, compress_file)
 
 
-def worker(task_queue, args, id):
+def worker(task_queue, progress_queue, args, id):
     """Worker function for parallel dynamic mask generation."""
     gpu_id = id % args.gpu_num
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)  # Bind to specific GPU
@@ -207,6 +207,7 @@ def worker(task_queue, args, id):
 
         predictor.reset_predictor()
         predict_mask(predictor, row, args, device)
+        progress_queue.put(index)
 
 
 def parse_args():
@@ -254,6 +255,7 @@ def main():
     # Setup multiprocessing
     manager = Manager()
     task_queue = manager.Queue()
+    progress_queue = manager.Queue()
     for index, row in df.iterrows():
         task_queue.put((index, row))
 
@@ -263,13 +265,21 @@ def main():
     ) as executor:
         futures = []
         for id in range(args.num_workers):
-            futures.append(executor.submit(worker, task_queue, args, id))
+            futures.append(executor.submit(worker, task_queue, progress_queue, args, id))
 
-        for future in tqdm(
-            concurrent.futures.as_completed(futures),
-            total=len(futures),
-            desc="Finished workers",
-        ):
+        processed = 0
+        total_tasks = len(df)
+        with tqdm(total=total_tasks, desc="Processing rows") as pbar:
+            while processed < total_tasks:
+                try:
+                    progress_queue.get(timeout=1)
+                    processed += 1
+                    pbar.update(1)
+                except queue.Empty:
+                    if all(f.done() for f in futures) and progress_queue.empty():
+                        break
+
+        for future in futures:
             future.result()
 
 

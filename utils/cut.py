@@ -217,7 +217,8 @@ def main():
             row_values, valid, error_msg = process_single_row(row, args, process_id=0)
             results_queue.put((index, row_values, valid, error_msg))
     else:
-        num_workers = args.num_workers if args.num_workers else os.cpu_count()
+        num_workers = args.num_workers if args.num_workers else os.cpu_count() or 1
+        results = []
 
         with concurrent.futures.ProcessPoolExecutor(
             max_workers=num_workers
@@ -228,15 +229,24 @@ def main():
                     executor.submit(worker, task_queue, results_queue, args, id)
                 )
 
-            for future in tqdm(
-                concurrent.futures.as_completed(futures),
-                total=len(futures),
-                desc="Finished workers",
-            ):
+            processed = 0
+            total_tasks = len(csv)
+            with tqdm(total=total_tasks, desc="Processing rows") as pbar:
+                while processed < total_tasks:
+                    try:
+                        results.append(results_queue.get(timeout=1))
+                        processed += 1
+                        pbar.update(1)
+                    except queue.Empty:
+                        if all(f.done() for f in futures) and results_queue.empty():
+                            break
+
+            for future in futures:
                 future.result()
 
     # Collect results
-    results = []
+    if args.disable_parallel:
+        results = []
     while not results_queue.empty():
         results.append(results_queue.get())
 

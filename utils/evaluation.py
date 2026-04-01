@@ -264,7 +264,20 @@ if __name__ == "__main__":
             for worker_id in range(args.num_workers):
                 futures.append(executor.submit(worker, task_queue, result_queue, args, worker_id))
 
-            for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Workers completing"):
+            processed = 0
+            total_tasks = len(df)
+            with tqdm(total=total_tasks, desc="Processing videos") as pbar:
+                while processed < total_tasks:
+                    try:
+                        index, result = result_queue.get(timeout=1)
+                        results.append((index, result))
+                        processed += 1
+                        pbar.update(1)
+                    except queue.Empty:
+                        if all(f.done() for f in futures) and result_queue.empty():
+                            break
+
+            for future in futures:
                 future.result()
 
         # Collect results

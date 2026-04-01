@@ -149,10 +149,10 @@ def main():
             csv.iterrows(), total=len(csv), desc="Processing rows"
         ):
             result = process_single_row(row, args)
-            results.append(result)
+            results.append((index, result))
     else:
         # Parallel processing
-        num_workers = args.num_workers if args.num_workers else os.cpu_count()
+        num_workers = args.num_workers if args.num_workers else os.cpu_count() or 1
 
         with concurrent.futures.ProcessPoolExecutor(
             max_workers=num_workers
@@ -162,24 +162,33 @@ def main():
                 future = executor.submit(worker, task_queue, results_queue, args)
                 futures.append(future)
 
-            for future in tqdm(
-                concurrent.futures.as_completed(futures),
-                total=len(futures),
-                desc="Workers completing",
-            ):
+            # Per-row progress is more informative than per-worker completion.
+            results = []
+            processed = 0
+            total_tasks = len(csv)
+            with tqdm(total=total_tasks, desc="Processing rows") as pbar:
+                while processed < total_tasks:
+                    try:
+                        results.append(results_queue.get(timeout=1))
+                        processed += 1
+                        pbar.update(1)
+                    except queue.Empty:
+                        if all(f.done() for f in futures) and results_queue.empty():
+                            break
+
+            for future in futures:
                 future.result()
 
-        # Collect results
-        results = []
-        while not results_queue.empty():
-            results.append(results_queue.get())
+            while not results_queue.empty():
+                results.append(results_queue.get())
 
     # Process results
     results.sort(key=lambda x: x[0])
     new_rows = []
     valid_rows = []
     for index, (rows, valid) in results:
-        valid_rows.append(index)
+        if valid:
+            valid_rows.append(index)
         new_rows.extend(rows)
 
     # Save corrected timestamps if needed

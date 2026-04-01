@@ -12,7 +12,6 @@ import queue
 import concurrent.futures
 from tqdm import tqdm
 import cv2
-from glob import glob
 from paddleocr import PaddleOCR
 
 
@@ -22,6 +21,9 @@ def process_single_row(row, args, model):
     img_list = sorted(glob(f"{img_dir}/img/*.jpg"))[:3]
     # Load images
     images = [cv2.imread(img_path) for img_path in img_list]
+    images = [img for img in images if img is not None]
+    if not images:
+        return 0.0
 
     result = model.predict(input=images)
     area = images[0].shape[0] * images[0].shape[1]  # Image area
@@ -133,11 +135,19 @@ def main():
                     executor.submit(worker, task_queue, result_queue, args, id)
                 )
 
-            for future in tqdm(
-                concurrent.futures.as_completed(futures),
-                total=len(futures),
-                desc="Finished workers",
-            ):
+            processed = 0
+            total_tasks = len(df)
+            with tqdm(total=total_tasks, desc="Processing rows") as pbar:
+                while processed < total_tasks:
+                    try:
+                        results.append(result_queue.get(timeout=1))
+                        processed += 1
+                        pbar.update(1)
+                    except queue.Empty:
+                        if all(f.done() for f in futures) and result_queue.empty():
+                            break
+
+            for future in futures:
                 future.result()
 
         # Collect and sort results
