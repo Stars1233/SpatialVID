@@ -40,7 +40,14 @@ def extract_frames_opencv(
         if frame % interval == 0:
             frame_filename = os.path.join(output_dir, f"frame_{frame:06d}.jpg")
             if target_size is not None:
-                image = cv2.resize(image, target_size)
+                h, w = image.shape[:2]
+                # Adaptively adjust target size based on video orientation
+                # For portrait videos (height > width), swap width and height of target size
+                if h > w:  # Portrait video
+                    target_w, target_h = target_size[1], target_size[0]
+                else:  # Landscape video
+                    target_w, target_h = target_size[0], target_size[1]
+                image = cv2.resize(image, (target_w, target_h))
             cv2.imwrite(frame_filename, image)
 
     cap.release()
@@ -98,7 +105,14 @@ def extract_frames_av(
                 if isinstance(target_size, str):
                      w, h = map(int, target_size.split('*'))
                      target_size = (w, h)
-                image = cv2.resize(image, target_size)
+                # Adaptively adjust target size based on video orientation
+                h, w = image.shape[:2]
+                # For portrait videos (height > width), swap width and height of target size
+                if h > w:  # Portrait video
+                    target_w, target_h = target_size[1], target_size[0]
+                else:  # Landscape video
+                    target_w, target_h = target_size[0], target_size[1]
+                image = cv2.resize(image, (target_w, target_h))
             cv2.imwrite(frame_filename, image)
 
         count += 1
@@ -170,7 +184,7 @@ def parse_args():
         "--target_size",
         type=str,
         default=None,
-        help="Resize frames to size (width*height)",
+        help="Resize frames to size (width*height). For portrait videos (h>w), dimensions will be automatically swapped to (height*width) to maintain correct orientation.",
     )
     parser.add_argument(
         "--num_workers", type=int, default=None, help="Number of parallel workers"
