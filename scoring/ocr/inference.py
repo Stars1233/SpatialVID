@@ -4,7 +4,7 @@ Calculates text area ratios for video clips using distributed processing.
 """
 
 import os
-import glob
+from glob import glob
 import argparse
 import pandas as pd
 from multiprocessing import Manager
