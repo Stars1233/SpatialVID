@@ -131,12 +131,14 @@ if [ "$FAST_CUT" = False ]; then
       --csv_save_path ${OUTPUT_DIR}/results.csv \
       --video_save_dir ${ROOT_CLIPS} \
       --num_workers $((GPU_NUM * 4)) \
-      --gpu_num $GPU_NUM
+      --gpu_num $GPU_NUM \
+      # --keep_audio 
 else
     echo "Using fast cutting based on keyframes."
     CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} measure_time 6 python utils/cut_fast.py \
       --csv_path ${ROOT_META}/filtered_clips.csv \
       --csv_save_path ${OUTPUT_DIR}/results.csv \
       --video_save_dir ${ROOT_CLIPS} \
-      --num_workers $((GPU_NUM * 4))
+      --num_workers $((GPU_NUM * 4)) \
+      # --keep_audio
 fi

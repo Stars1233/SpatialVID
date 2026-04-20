@@ -3,7 +3,7 @@ High-speed video cutting utility using FFmpeg stream copy.
 
 Features:
 - No re-encoding: uses `-c copy`
-- Video only: drops audio with `-map 0:v:0`
+- Optional audio: use --keep_audio to retain audio tracks
 - Group tasks by source video_path for better efficiency
 - Parallel processing by video group
 - Per-clip progress bar
@@ -29,9 +29,14 @@ from tqdm import tqdm
 FFMPEG_PATH = "/usr/local/bin/ffmpeg"
 
 
-def process_single_row(row, save_dir):
+def process_single_row(row, save_dir, keep_audio=False):
     """
     Cut one clip from source video using ffmpeg stream copy.
+
+    Args:
+        row:        DataFrame row with clip metadata
+        save_dir:   directory to save output clips
+        keep_audio: if True, copy audio streams; if False, drop audio
 
     Returns:
         (row_values_list, valid, error_message)
@@ -69,7 +74,16 @@ def process_single_row(row, save_dir):
         return row.values.tolist(), False, error_msg
 
     try:
-        # Fast seek + stream copy, video only, no audio.
+        # Build stream mapping and audio arguments based on keep_audio flag.
+        # '0:a?' uses '?' so FFmpeg silently skips if no audio track exists.
+        if keep_audio:
+            map_args = ["-map", "0:v:0", "-map", "0:a?"]
+            audio_args = ["-c:a", "copy"]
+        else:
+            map_args = ["-map", "0:v:0"]
+            audio_args = ["-an"]
+
+        # Fast seek + stream copy; explicitly specify video codec to avoid ambiguity.
         cmd = [
             FFMPEG_PATH,
             "-nostdin",
@@ -80,10 +94,9 @@ def process_single_row(row, save_dir):
             str(duration),
             "-i",
             video_path,
-            "-map",
-            "0:v:0",
-            "-an",
-            "-c",
+            *map_args,
+            *audio_args,
+            "-c:v",
             "copy",
             "-avoid_negative_ts",
             "make_zero",
@@ -122,17 +135,17 @@ def process_single_row(row, save_dir):
         return row.values.tolist(), False, error_msg
 
 
-def process_video_group(group_df, save_dir):
+def process_video_group(group_df, save_dir, keep_audio=False):
     """
     Process all clips from the same source video.
 
     Args:
-        group_df: DataFrame containing rows from one source video_path
-        save_dir: output clip directory
+        group_df:   DataFrame containing rows from one source video_path
+        save_dir:   output clip directory
+        keep_audio: passed through to process_single_row
 
     Returns:
-        list of tuples:
-            (index, row_values, valid, error_msg)
+        list of tuples: (index, row_values, valid, error_msg)
     """
     results = []
 
@@ -141,13 +154,15 @@ def process_video_group(group_df, save_dir):
         group_df = group_df.sort_values(by="timestamp_start")
 
     for index, row in group_df.iterrows():
-        row_values, valid, error_msg = process_single_row(row, save_dir)
+        row_values, valid, error_msg = process_single_row(
+            row, save_dir, keep_audio=keep_audio
+        )
         results.append((index, row_values, valid, error_msg))
 
     return results
 
 
-def worker(task_queue, results_queue, video_save_dir):
+def worker(task_queue, results_queue, video_save_dir, keep_audio=False):
     """
     Worker that processes one video group at a time.
     """
@@ -158,7 +173,9 @@ def worker(task_queue, results_queue, video_save_dir):
             break
 
         try:
-            group_results = process_video_group(group_df, video_save_dir)
+            group_results = process_video_group(
+                group_df, video_save_dir, keep_audio=keep_audio
+            )
             for item in group_results:
                 results_queue.put(item)
         finally:
@@ -191,6 +208,11 @@ def parse_args():
         "--drop_invalid_timestamps",
         action="store_true",
         help="Drop invalid timestamp rows and save corrected CSV",
+    )
+    parser.add_argument(
+        "--keep_audio",
+        action="store_true",
+        help="Retain audio tracks in output clips (dropped by default)",
     )
     return parser.parse_args()
 
@@ -226,7 +248,9 @@ def main():
 
         with tqdm(total=total_tasks, desc="Processing clips", dynamic_ncols=True) as pbar:
             for video_path, group_df in grouped_items:
-                group_results = process_video_group(group_df, args.video_save_dir)
+                group_results = process_video_group(
+                    group_df, args.video_save_dir, keep_audio=args.keep_audio
+                )
                 for item in group_results:
                     results.append(item)
                     _, _, valid, _ = item
@@ -252,7 +276,13 @@ def main():
             futures = []
             for _ in range(num_workers):
                 futures.append(
-                    executor.submit(worker, task_queue, results_queue, args.video_save_dir)
+                    executor.submit(
+                        worker,
+                        task_queue,
+                        results_queue,
+                        args.video_save_dir,
+                        args.keep_audio,  # Forward keep_audio flag to each worker
+                    )
                 )
 
             finished = 0
@@ -316,7 +346,6 @@ def main():
     if success_rows:
         success_df = pd.DataFrame(success_rows, columns=columns)
 
-        # Keep output CSV cleaner, matching your earlier style
         for col in ["timestamp_start", "timestamp_end", "frame_start", "frame_end"]:
             if col in success_df.columns:
                 success_df = success_df.drop(columns=[col])
@@ -326,7 +355,7 @@ def main():
     else:
         print("No successful clips were generated.")
 
-    # Save failed CSV
+    # Save failed clips CSV
     if failed_rows:
         base, ext = os.path.splitext(args.csv_save_path)
         failed_csv_path = f"{base}_failed{ext}"

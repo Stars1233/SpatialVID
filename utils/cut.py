@@ -110,7 +110,14 @@ def process_single_row(row, args, process_id):
                     f"scale='if(gt(iw,ih),-2,{shorter_size})':'if(gt(iw,ih),{shorter_size},-2)'",
                 ]
 
-        cmd += ["-map", "0:v", save_path]
+        # Map video stream; optionally include audio stream.
+        # '0:a?' uses '?' so FFmpeg silently skips if no audio track exists.
+        if args.keep_audio:
+            cmd += ["-map", "0:v", "-map", "0:a?", "-c:a", "aac"]
+        else:
+            cmd += ["-map", "0:v", "-an"]
+
+        cmd += [save_path]
 
         subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
 
@@ -172,6 +179,11 @@ def parse_args():
     )
     parser.add_argument(
         "--gpu_num", type=int, default=1, help="Number of GPUs available"
+    )
+    parser.add_argument(
+        "--keep_audio",
+        action="store_true",
+        help="Retain audio tracks in output clips (dropped by default)",
     )
     return parser.parse_args()
 
