@@ -70,9 +70,9 @@ def poses_to_multi_instructions(poses_array, translation_thresh, rotation_thresh
         pos_t1_w2c, rot_t1_w2c = poses[i+interval]
         delta_rot = rot_t1_w2c * rot_t_w2c.inv()
 
-        pos_t_c2w = rot_t_w2c.inv().apply(pos_t_w2c)
-        pos_t1_c2w = rot_t1_w2c.inv().apply(pos_t1_w2c)
-        local_delta_pos = rot_t_w2c.inv().apply(pos_t1_c2w - pos_t_c2w)
+        pos_t_c2w = -rot_t_w2c.inv().apply(pos_t_w2c)
+        pos_t1_c2w = -rot_t1_w2c.inv().apply(pos_t1_w2c)
+        local_delta_pos = rot_t_w2c.apply(pos_t1_c2w - pos_t_c2w)
 
         dx, dy, dz = local_delta_pos
         yaw, pitch, roll = delta_rot.as_euler(
@@ -387,7 +387,7 @@ def main():
     if args.disable_parallel:
         # Serial processing
         for index, row in tqdm(csv.iterrows(), total=len(csv), desc="Processing"):
-            process_single_row(index, args, row, param_combinations)
+            process_single_row(args, row, param_combinations)
     else:
         # Parallel processing
         manager = Manager()

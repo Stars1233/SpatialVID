@@ -81,9 +81,9 @@ def poses_to_multi_instructions(poses_array, translation_thresh, rotation_thresh
         pos_t1_w2c, rot_t1_w2c = poses[i+1]
         delta_rot = rot_t1_w2c * rot_t_w2c.inv()
 
-        pos_t_c2w = rot_t_w2c.inv().apply(pos_t_w2c)
-        pos_t1_c2w = rot_t1_w2c.inv().apply(pos_t1_w2c)
-        local_delta_pos = rot_t_w2c.inv().apply(pos_t1_c2w - pos_t_c2w)
+        pos_t_c2w = -rot_t_w2c.inv().apply(pos_t_w2c)
+        pos_t1_c2w = -rot_t1_w2c.inv().apply(pos_t1_w2c)
+        local_delta_pos = rot_t_w2c.apply(pos_t1_c2w - pos_t_c2w)
 
         dx, dy, dz = local_delta_pos
         euler_angles_rad = delta_rot.as_euler(
